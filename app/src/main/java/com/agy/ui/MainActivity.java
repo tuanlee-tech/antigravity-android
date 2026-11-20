@@ -433,6 +433,14 @@ public class MainActivity extends Activity
             Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
                     | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                try {
+                    Uri initialUri = android.provider.DocumentsContract.buildDocumentUri(
+                            "com.android.externalstorage.documents", "primary:Documents");
+                    intent.putExtra(android.provider.DocumentsContract.EXTRA_INITIAL_URI, initialUri);
+                } catch (Throwable ignored) {
+                }
+            }
             startActivityForResult(intent, REQUEST_DIR_CHOOSER);
         } catch (Throwable t) {
             Log.w(TAG, "Cannot launch directory picker: " + t.getMessage());

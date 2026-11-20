@@ -8,95 +8,121 @@ description: >-
   ("cài môi trường", "cài git python node", "clone repo private", "đăng nhập github").
 ---
 
-# Android Setup & Private GitHub Helper
+# Android Setup & Private GitHub Helper (Fast Track)
 
-Interactive guide for setting up the Android Bionic toolchain (`$HOME/usr`, `pkg`)
-and cloning/authenticating private GitHub repositories without manual copy-pasting.
+Deterministic, low-latency workflow for setting up the Android Bionic toolchain
+(`$PREFIX`, `pkg`) and authenticating/cloning private GitHub repositories with zero
+terminal typing required from the user.
+
+## Hard-Earned Android Facts (Do NOT waste turns re-discovering)
+- **Go DNS on Android:** Always prefix `gh` commands with `GODEBUG=netdns=cgo` (shell bridges already export it, and keeping it explicit guarantees success in subshells).
+- **No Browser Intent from Sandbox:** `am start` is blocked by Android SELinux (`INTERACT_ACROSS_USERS_FULL`). **NEVER** try `am start` or `rish` to open URLs; print a clickable markdown link and send the code via `agy-notify`.
+- **Termux `git` ELF Shell Path:** Prebuilt Termux `git` & `git-remote-http` hardcode `/data/data/com.termux/files/usr/bin/sh`. `pkg install` and `agy-fix-paths` patch ELF binaries automatically to `/system/bin/sh` without requiring `python3`; always ensure `agy-fix-paths` has run if any package/script paths were modified.
+- **Fastest Git Credential Helper:** Sync `gh auth token` into `~/.git-credentials` (`chmod 600`) with `credential.helper store` instead of `gh auth setup-git` (avoids spawning the Go binary on every `git fetch/push`).
+- **Shared Storage `noexec`:** `/storage/emulated/0` is mounted `noexec`; always invoke scripts via `bash`, `python3`, or `node`.
+- **Live Sidebar Sync:** Register cloned folders into the Projects sidebar automatically using `agy-projects add "<dir>"`.
+
+---
 
 ## Step 0: Determine User Intent
 
-If the user invokes `/android-setup` without specifying a task, use `ask_question`
-to ask what they want to do:
-1. **Install Dev Environment** (`git`, `python`, `nodejs`)
-2. **Setup GitHub Auth & Clone Private Repo**
-3. **Both (Install Tools + Clone Private Repo)**
+If the user invokes `/android-setup` without specifying a task, use `ask_question`:
+1. `(Recommended) Both (Install Tools + GitHub Auth & Clone Repo)`
+2. `Install Dev Environment (git, python, nodejs)`
+3. `Setup GitHub Auth & Clone Private Repo`
 
 ---
 
-## Task A: Install Dev Environment (`pkg`)
+## Step 1: One-Shot Bootstrap (Install Missing Only + Patch + Config + Status Check)
 
-1. **Verify `pkg` is ready**:
-   ```bash
-   which pkg && ls -la "$HOME/usr/bin/pkg"
-   ```
-   - If `pkg` is missing, check `$HOME/logs/env_install.log`:
-     ```bash
-     cat "$HOME/logs/env_install.log" 2>&1 || true
-     ```
-   - On a fresh app launch, the background Bionic installer takes ~10–20 seconds.
-     Wait briefly and re-check, or report the error in `env_install.log`.
+Run **a single combined command** tailored to the user's choice:
+- Verify `pkg` exists (if missing, inspect `$HOME/logs/env_install.log` — on a fresh app launch the background Bionic installer takes ~10–20s).
+- Install **ONLY missing packages** from the requested set (`git python nodejs gh` for Both; `git python nodejs` for Dev Env; `git gh` for GitHub Auth — **never** pass `-y` to `pkg`).
+- Run `agy-fix-paths` (patches shebangs + Termux ELF shell paths).
+- Configure Git global TLS CA, `safe.directory '*'`, and `credential.helper store`.
+- Print installed versions and `gh auth status`.
 
-2. **Install requested packages** (do **NOT** pass `-y` to `pkg`):
-   ```bash
-   pkg update && pkg install git python nodejs
-   ```
-   *(Add any extra packages the user asked for, such as `gh`, `openssh`, `clang`, `curl`.)*
+```bash
+set -e
+command -v pkg >/dev/null || { cat "$HOME/logs/env_install.log" 2>&1 || true; exit 1; }
 
-3. **Fix shebangs & verify binaries**:
-   ```bash
-   command -v agy-fix-paths >/dev/null 2>&1 && agy-fix-paths || true
-   git --version && python3 --version && node -v
-   ```
+# Adjust checked tools if user only asked for Dev Env (omit gh) or GitHub Auth (git + gh)
+MISSING=""
+command -v git >/dev/null 2>&1     || MISSING="$MISSING git"
+command -v python3 >/dev/null 2>&1 || MISSING="$MISSING python"
+command -v node >/dev/null 2>&1    || MISSING="$MISSING nodejs"
+command -v gh >/dev/null 2>&1      || MISSING="$MISSING gh"
+
+if [ -n "$MISSING" ]; then
+  pkg update && pkg install $MISSING
+fi
+
+command -v agy-fix-paths >/dev/null 2>&1 && agy-fix-paths || true
+
+GIT_CONFIG_NOSYSTEM=1 git config --global http.sslCAInfo "$PREFIX/etc/tls/cert.pem"
+GIT_CONFIG_NOSYSTEM=1 git config --global --add safe.directory '*'
+GIT_CONFIG_NOSYSTEM=1 git config --global credential.helper store
+
+git --version
+command -v python3 >/dev/null 2>&1 && python3 --version || true
+command -v node >/dev/null 2>&1 && node -v || true
+command -v gh >/dev/null 2>&1 && GODEBUG=netdns=cgo gh --version || true
+command -v gh >/dev/null 2>&1 && GODEBUG=netdns=cgo gh auth status 2>&1 || true
+```
+
+If the user only requested **Install Dev Environment**, summarize the installed versions and stop here.
 
 ---
 
-## Task B: Authenticate GitHub & Clone Private Repository
+## Step 2: Automated Headless GitHub Login (If Not Logged In)
 
-1. **Ensure `git` is installed**:
-   If `which git` fails, run `pkg update && pkg install git` first.
+Do **NOT** ask the user to open the built-in terminal. Run the device flow directly:
 
-2. **Configure TLS CA & safe.directory for Android shared storage** (run once):
+1. Start `gh auth login` in background (set `WaitMsBeforeAsync: 4000` so it detaches into a background task while waiting for browser approval):
    ```bash
-   GIT_CONFIG_NOSYSTEM=1 git config --global http.sslCAInfo "$HOME/usr/etc/tls/cert.pem"
-   GIT_CONFIG_NOSYSTEM=1 git config --global --add safe.directory '*'
+   printf "\n" | GODEBUG=netdns=cgo gh auth login --hostname github.com -p https --web --insecure-storage
+   ```
+2. Read the background task output log to extract the 8-character one-time code (`XXXX-XXXX`).
+3. Pin the code to Android's status bar notification for easy copy:
+   ```bash
+   agy-notify post -t "GitHub Auth Code" -m "Code: <CODE>" --tag gh-auth 2>&1 || true
+   ```
+4. Reply to the user with:
+   - The bold code **`<CODE>`**
+   - Clickable link: `https://github.com/login/device`
+   - Stop calling tools and wait passively for the background task completion notification (do **NOT** poll in a loop).
+
+5. Once the background task completes with exit code `0` (or if already logged in from Step 1), sync the token into `~/.git-credentials`, cancel the notification, and list recent repos in **one command**:
+   ```bash
+   USER_LOGIN="$(GODEBUG=netdns=cgo gh api user --jq .login)"
+   TOKEN="$(GODEBUG=netdns=cgo gh auth token)"
+   printf 'https://%s:%s@github.com\n' "$USER_LOGIN" "$TOKEN" > "$HOME/.git-credentials"
+   chmod 600 "$HOME/.git-credentials"
+   GIT_CONFIG_NOSYSTEM=1 git config --global --unset-all credential.https://github.com.helper 2>/dev/null || true
+   GIT_CONFIG_NOSYSTEM=1 git config --global --unset-all credential.https://gist.github.com.helper 2>/dev/null || true
+   agy-notify cancel gh-auth 2>&1 || true
+   GODEBUG=netdns=cgo gh repo list "$USER_LOGIN" --limit 8 --json nameWithOwner,isPrivate --jq '.[] | "\(.nameWithOwner) (\(if .isPrivate then "Private" else "Public" end))"'
    ```
 
-3. **Check existing GitHub authentication** (always pass `GODEBUG=netdns=cgo` for Go-based Bionic CLIs like `gh` so they use Android's system DNS instead of `[::1]:53`):
+*(Only if the user explicitly requests PAT or SSH Key instead of `gh`, store the PAT in `~/.git-credentials` via terminal or install `openssh` + generate `~/.ssh/id_ed25519`.)*
+
+---
+
+## Step 3: Clone / Sync Repository & Add to Sidebar
+
+1. Use `ask_question` presenting the user's recent repos from Step 2 (the built-in write-in option lets them enter any custom URL if needed).
+2. Clone to `/storage/emulated/0/Documents/<repo-name>` (or `git fetch` + `git status` if `.git` already exists) and register in the Projects sidebar in **one command**:
    ```bash
-   GODEBUG=netdns=cgo gh auth status 2>&1 || true
-   ls -la ~/.git-credentials ~/.ssh/id_ed25519 2>&1 || true
+   mkdir -p "/storage/emulated/0/Documents"
+   TARGET="/storage/emulated/0/Documents/<repo-name>"
+   REPO_URL="https://github.com/<owner>/<repo>.git"
+   if [ -d "$TARGET/.git" ]; then
+     GIT_CONFIG_NOSYSTEM=1 GIT_TERMINAL_PROMPT=0 git -C "$TARGET" fetch -v
+     GIT_CONFIG_NOSYSTEM=1 git -C "$TARGET" status
+   else
+     GIT_CONFIG_NOSYSTEM=1 GIT_TERMINAL_PROMPT=0 git clone "$REPO_URL" "$TARGET"
+     GIT_CONFIG_NOSYSTEM=1 git -C "$TARGET" status
+   fi
+   command -v agy-projects >/dev/null 2>&1 && agy-projects add "$TARGET" || true
    ```
-
-4. **If not authenticated**, ask the user via `ask_question` which login method
-   they prefer:
-   - **GitHub CLI (`gh`) (Recommended)**:
-     1. Install `gh`: `pkg install gh`
-     2. Instruct the user to run `GODEBUG=netdns=cgo gh auth login` in the built-in terminal and choose:
-        `GitHub.com` → `HTTPS` → `Y` (*Authenticate Git with your GitHub credentials*) → `Login with a web browser`, then complete browser login and reply when done.
-     3. Verify with `GODEBUG=netdns=cgo gh auth status`.
-   - **Personal Access Token (PAT)**:
-     1. Ask the user to create a token with `repo` scope at `https://github.com/settings/tokens`
-        and run the following inside the built-in terminal (**never** ask them to paste raw tokens into chat or embed tokens inside `.git/config`):
-        ```bash
-        git config --global credential.helper store
-        printf 'https://<USERNAME>:<TOKEN>@github.com\n' > ~/.git-credentials
-        chmod 600 ~/.git-credentials
-        ```
-   - **SSH Key**:
-     1. Install OpenSSH and generate a key if missing:
-        ```bash
-        pkg install openssh
-        [ -f ~/.ssh/id_ed25519 ] || ssh-keygen -t ed25519 -N "" -C "antigravity-android" -f ~/.ssh/id_ed25519
-        cat ~/.ssh/id_ed25519.pub
-        ```
-     2. Show the printed public key and ask the user to add it at `https://github.com/settings/keys`, then verify with `ssh -T -o StrictHostKeyChecking=no git@github.com`.
-     3. Clone using the SSH URL (`git@github.com:<owner>/<repo>.git`).
-
-5. **Clone the repository**:
-   - Ask for the repository URL (and destination folder; default to `/storage/emulated/0/Documents/<repo-name>`).
-   - Run:
-     ```bash
-     GIT_CONFIG_NOSYSTEM=1 GIT_TERMINAL_PROMPT=0 git clone "<REPO_URL>" "<TARGET_DIR>"
-     ```
-   - Verify with `git -C "<TARGET_DIR>" status` and `ls -la "<TARGET_DIR>"`.
-   - **Reminder**: `/storage/emulated/0` is mounted `noexec` on Android; invoke scripts explicitly via `bash script.sh` / `python3 script.py` / `node script.js`.
+3. Report completion clearly, remind the user about `/storage/emulated/0` `noexec` (`bash` / `python3` / `node`), and mention `/github-clone` (browse & clone repos anytime) and `/load-projects` (batch-add existing folders to the Projects sidebar).

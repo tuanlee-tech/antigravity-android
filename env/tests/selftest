@@ -171,6 +171,115 @@ else
 fi
 rm -rf "$BRIDGE_TMP"
 
+# ---- zero-Python ELF shell patching (patch_elf_shell + agy-fix-paths) ------
+ELF_TMP="$(mktemp -d)"
+mkdir -p "$ELF_TMP/usr/bin" "$ELF_TMP/usr/libexec/git-core"
+ELF_GIT="$ELF_TMP/usr/bin/git"
+ELF_HTTP="$ELF_TMP/usr/libexec/git-core/git-remote-http"
+{
+    printf '\x7fELF\x02\x01\x01\x00PADDING'
+    printf '/data/data/com.termux/files/usr/bin/sh\0'
+    printf 'TAIL_DECOY:/data/data/com.termux/files/usr/bin/sh_keep\0'
+} > "$ELF_GIT"
+cp "$ELF_GIT" "$ELF_HTTP"
+chmod 750 "$ELF_GIT" "$ELF_HTTP"
+orig_len="$(wc -c < "$ELF_GIT" | tr -d ' ')"
+before_mode="$(stat -c '%a' "$ELF_GIT" 2>/dev/null || echo "")"
+
+patch_elf_shell "$ELF_GIT"
+new_len="$(wc -c < "$ELF_GIT" | tr -d ' ')"
+after_mode="$(stat -c '%a' "$ELF_GIT" 2>/dev/null || echo "")"
+if [ "$orig_len" = "$new_len" ] \
+        && [ "$after_mode" = "$before_mode" ] \
+        && ! LC_ALL=C tr '\000' '\n' < "$ELF_GIT" | grep -Fxq '/data/data/com.termux/files/usr/bin/sh' \
+        && LC_ALL=C grep -aqF '/system/bin/sh' "$ELF_GIT" \
+        && LC_ALL=C grep -aqF '/data/data/com.termux/files/usr/bin/sh_keep' "$ELF_GIT"; then
+    ok "patch_elf_shell patches ELF NUL-terminated shell in-place preserving size, mode & decoy"
+else
+    bad "patch_elf_shell patches ELF NUL-terminated shell in-place preserving size, mode & decoy"
+fi
+
+PREFIX="$ELF_TMP/usr" bash "$SELF/../overlay/bin/agy-fix-paths" "$ELF_TMP/usr" >/dev/null 2>&1 || true
+if [ "$(wc -c < "$ELF_HTTP" | tr -d ' ')" = "$orig_len" ] \
+        && LC_ALL=C grep -aqF '/system/bin/sh' "$ELF_HTTP" \
+        && ! LC_ALL=C tr '\000' '\n' < "$ELF_HTTP" | grep -Fxq '/data/data/com.termux/files/usr/bin/sh'; then
+    ok "agy-fix-paths patches git-remote-http ELF without python3"
+else
+    bad "agy-fix-paths patches git-remote-http ELF without python3"
+fi
+rm -rf "$ELF_TMP"
+
+# ---- agy-projects (list/scan/add/remove + UTF-8/spaces URI + atomic JSON) --
+PROJ_TMP="$(mktemp -d)"
+DOCS_TMP="$PROJ_TMP/Documents"
+PSTORE_TMP="$PROJ_TMP/projects"
+mkdir -p "$DOCS_TMP/plain app" "$DOCS_TMP/Dự Án Việt" "$DOCS_TMP/git-repo/.git"
+printf 'ref: refs/heads/develop\n' > "$DOCS_TMP/git-repo/.git/HEAD"
+export AGY_PROJECTS_DIR="$PSTORE_TMP"
+export AGY_DOCS_DIR="$DOCS_TMP"
+AGY_PROJ_BIN="$SELF/../overlay/bin/agy-projects"
+
+scan_before="$(bash "$AGY_PROJ_BIN" scan "$DOCS_TMP")"
+if printf '%s\n' "$scan_before" | grep -q $'^new\tgit\tgit-repo\t' \
+        && printf '%s\n' "$scan_before" | grep -q $'^new\tfolder\tplain app\t'; then
+    ok "agy-projects scan finds unloaded git and plain folders"
+else
+    bad "agy-projects scan finds unloaded git and plain folders ($scan_before)"
+fi
+
+add_out="$(bash "$AGY_PROJ_BIN" add "$DOCS_TMP/git-repo" "$DOCS_TMP/plain app" "$DOCS_TMP/Dự Án Việt")"
+if printf '%s\n' "$add_out" | grep -q $'^added\t.*\tgit-repo\t' \
+        && printf '%s\n' "$add_out" | grep -q $'^added\t.*\tplain app\t' \
+        && printf '%s\n' "$add_out" | grep -q $'^added\t.*\tDự Án Việt\t'; then
+    ok "agy-projects add registers git, space, and UTF-8 folders"
+else
+    bad "agy-projects add registers git, space, and UTF-8 folders ($add_out)"
+fi
+
+dup_out="$(bash "$AGY_PROJ_BIN" add "$DOCS_TMP/git-repo")"
+if printf '%s\n' "$dup_out" | grep -q $'^exists\t'; then
+    ok "agy-projects add is idempotent for duplicates"
+else
+    bad "agy-projects add is idempotent for duplicates ($dup_out)"
+fi
+
+json_list="$(bash "$AGY_PROJ_BIN" list --json)"
+json_ok=1
+if command -v python3 >/dev/null 2>&1 || command -v python >/dev/null 2>&1; then
+    py_bin="python3"; command -v python3 >/dev/null 2>&1 || py_bin="python"
+    printf '%s' "$json_list" | "$py_bin" -m json.tool >/dev/null 2>&1 || json_ok=0
+    for jf in "$PSTORE_TMP"/*.json; do
+        "$py_bin" -m json.tool "$jf" >/dev/null 2>&1 || json_ok=0
+    done
+fi
+if [ "$json_ok" = 1 ] \
+        && printf '%s\n' "$json_list" | grep -q 'plain app' \
+        && grep -rq '"defaultBranch": "develop"' "$PSTORE_TMP"/*.json \
+        && grep -rq 'plain%20app' "$PSTORE_TMP"/*.json \
+        && grep -rq 'D%E1%BB%B1%20%C3%81n%20Vi%E1%BB%87t' "$PSTORE_TMP"/*.json; then
+    ok "agy-projects writes valid percent-encoded git/folder JSON & lists them"
+else
+    bad "agy-projects writes valid percent-encoded git/folder JSON & lists them ($json_list)"
+fi
+
+scan_after="$(bash "$AGY_PROJ_BIN" scan "$DOCS_TMP")"
+if [ -z "$scan_after" ]; then
+    ok "agy-projects scan omits already-loaded folders"
+else
+    bad "agy-projects scan omits already-loaded folders ($scan_after)"
+fi
+
+if ! bash "$AGY_PROJ_BIN" remove outside-of-project >/dev/null 2>&1 \
+        && bash "$AGY_PROJ_BIN" remove "plain app" >/dev/null 2>&1 \
+        && bash "$AGY_PROJ_BIN" scan "$DOCS_TMP" | grep -q $'^new\tfolder\tplain app\t'; then
+    ok "agy-projects remove unlinks project and protects outside-of-project"
+else
+    bad "agy-projects remove unlinks project and protects outside-of-project"
+fi
+
+unset AGY_PROJECTS_DIR AGY_DOCS_DIR
+rm -rf "$PROJ_TMP"
+
 rm -rf "$(dirname "$PREFIX")"
 printf '== failures: %s ==\n' "$fail"
 [ "$fail" = 0 ]

@@ -169,6 +169,7 @@ public final class EnvInstaller {
             TermuxSymlinkFixer.fix(prefix, targetPrefix);
             TermuxShebangRewriter.rewrite(prefix, targetPrefix);
             TermuxPrefixRewriter.rewrite(prefix, targetPrefix);
+            TermuxElfShellPatcher.patch(prefix);
         }
         if (overlayChanged || pkgChanged) {
             FileModeUtil.recursiveSetExec(new File(prefix, "bin"));
@@ -193,6 +194,7 @@ public final class EnvInstaller {
         TermuxSymlinkFixer.fix(root, targetPrefix);
         TermuxShebangRewriter.rewrite(root, targetPrefix);
         TermuxPrefixRewriter.rewrite(root, targetPrefix);
+        TermuxElfShellPatcher.patch(root);
         FileModeUtil.recursiveSetExec(new File(root, "bin"));
         FileModeUtil.setExec(new File(root, "libexec/pkg/pkg"));
         File fixPaths = new File(root, EnvPaths.FIX_PATHS_REL);

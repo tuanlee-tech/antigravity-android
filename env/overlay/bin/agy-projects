@@ -1,0 +1,487 @@
+#!/data/user/0/com.agy/files/usr/bin/bash
+# agy-projects -- manage Antigravity sidebar projects ($HOME/.gemini/config/projects).
+# Writes protojson files compatible with language_server's StartWatcher so changes
+# reflect live in the sidebar without restarting the app. Pure Bash + AWK.
+set -uo pipefail
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
+PREFIX="${PREFIX:-$(cd -- "$SCRIPT_DIR/.." 2>/dev/null && pwd)}"
+HOME="${HOME:-$(dirname "$PREFIX")}"
+PROJECTS_DIR="${AGY_PROJECTS_DIR:-$HOME/.gemini/config/projects}"
+DEFAULT_SCAN_DIR="${AGY_DOCS_DIR:-/storage/emulated/0/Documents}"
+
+usage() {
+    cat <<'EOF'
+agy-projects -- manage Antigravity Projects sidebar
+
+Usage:
+  agy-projects list [--json]                  List projects currently loaded in sidebar
+  agy-projects scan [dir] [--all]             Scan dir (default: /storage/emulated/0/Documents)
+                                              for folders not yet in sidebar (or --all)
+  agy-projects add [--name <label>] <dir...>  Register folder(s) in sidebar (idempotent)
+  agy-projects remove <id|name|path...>       Remove project(s) from sidebar (files stay on disk)
+  agy-projects help                           Show this help
+EOF
+}
+
+normalize_path() {
+    local p="$1"
+    while [[ "$p" == *"//"* ]]; do
+        p="${p//\/\//\/}"
+    done
+    while [ "${#p}" -gt 1 ] && [[ "$p" == */ ]]; do
+        p="${p%/}"
+    done
+    if [[ "$p" != /* ]] && [ -d "$p" ]; then
+        p="$(cd -- "$p" 2>/dev/null && pwd)"
+    fi
+    printf '%s' "$p"
+}
+
+uri_encode_path() {
+    LC_ALL=C awk -v p="$1" '
+    BEGIN {
+        unreserved = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~/"
+        for (i = 1; i < 256; i++) {
+            ord[sprintf("%c", i)] = i
+        }
+        out = "file://"
+        if (substr(p, 1, 1) != "/") {
+            out = out "/"
+        }
+        n = length(p)
+        for (i = 1; i <= n; i++) {
+            c = substr(p, i, 1)
+            if (index(unreserved, c) > 0) {
+                out = out c
+            } else if (c in ord) {
+                out = out sprintf("%%%02X", ord[c])
+            }
+        }
+        printf "%s", out
+    }'
+}
+
+uri_decode_path() {
+    LC_ALL=C awk -v u="$1" '
+    BEGIN {
+        for (i = 0; i <= 9; i++) hex[i ""] = i
+        hex["A"] = hex["a"] = 10
+        hex["B"] = hex["b"] = 11
+        hex["C"] = hex["c"] = 12
+        hex["D"] = hex["d"] = 13
+        hex["E"] = hex["e"] = 14
+        hex["F"] = hex["f"] = 15
+
+        if (substr(u, 1, 17) == "file://localhost/") {
+            u = substr(u, 17)
+        } else if (substr(u, 1, 7) == "file://") {
+            u = substr(u, 8)
+        }
+        out = ""
+        n = length(u)
+        i = 1
+        while (i <= n) {
+            c = substr(u, i, 1)
+            if (c == "%" && i + 2 <= n) {
+                h1 = substr(u, i + 1, 1)
+                h2 = substr(u, i + 2, 1)
+                if ((h1 in hex) && (h2 in hex)) {
+                    out = out sprintf("%c", hex[h1] * 16 + hex[h2])
+                    i += 3
+                    continue
+                }
+            }
+            out = out c
+            i++
+        }
+        while (length(out) > 1 && substr(out, length(out), 1) == "/") {
+            out = substr(out, 1, length(out) - 1)
+        }
+        printf "%s", out
+    }'
+}
+
+json_escape() {
+    LC_ALL=C awk -v s="$1" '
+    BEGIN {
+        n = length(s)
+        out = ""
+        for (i = 1; i <= n; i++) {
+            c = substr(s, i, 1)
+            if (c == "\\") out = out "\\\\"
+            else if (c == "\"") out = out "\\\""
+            else if (c == "\t") out = out "\\t"
+            else if (c == "\r") out = out "\\r"
+            else if (c == "\n") out = out "\\n"
+            else out = out c
+        }
+        printf "%s", out
+    }'
+}
+
+# Extract top-level id, name, and first folderUri (or folder_uri) from a Project JSON file.
+parse_project_file() {
+    LC_ALL=C awk '
+    function extract_str(doc, key,    pat, idx, rest, pos, n, i, ch, esc, out) {
+        pat = "\"" key "\""
+        idx = index(doc, pat)
+        while (idx > 0) {
+            rest = substr(doc, idx + length(pat))
+            if (rest ~ /^[[:space:]]*:[[:space:]]*"/) {
+                sub(/^[[:space:]]*:[[:space:]]*"/, "", rest)
+                n = length(rest)
+                out = ""
+                esc = 0
+                for (i = 1; i <= n; i++) {
+                    ch = substr(rest, i, 1)
+                    if (esc) {
+                        if (ch == "n") out = out "\n"
+                        else if (ch == "r") out = out "\r"
+                        else if (ch == "t") out = out "\t"
+                        else out = out ch
+                        esc = 0
+                    } else if (ch == "\\") {
+                        esc = 1
+                    } else if (ch == "\"") {
+                        return out
+                    } else {
+                        out = out ch
+                    }
+                }
+            }
+            # Advance past this occurrence and search again
+            doc = substr(doc, idx + length(pat))
+            idx = index(doc, pat)
+        }
+        return ""
+    }
+    { buf = buf $0 " " }
+    END {
+        id = extract_str(buf, "id")
+        name = extract_str(buf, "name")
+        uri = extract_str(buf, "folderUri")
+        if (uri == "") uri = extract_str(buf, "folder_uri")
+        printf "%s\t%s\t%s\n", id, name, uri
+    }' "$1"
+}
+
+gen_uuid() {
+    if [ -r /proc/sys/kernel/random/uuid ]; then
+        local u
+        u="$(tr -d ' \r\n' < /proc/sys/kernel/random/uuid 2>/dev/null)"
+        if [ -n "$u" ]; then
+            printf '%s' "$u"
+            return 0
+        fi
+    fi
+    if [ -r /dev/urandom ] && command -v od >/dev/null 2>&1; then
+        local hex
+        hex="$(od -An -tx1 -N16 /dev/urandom 2>/dev/null | tr -d ' \r\n')"
+        if [ "${#hex}" -ge 32 ]; then
+            printf '%s-%s-4%s-8%s-%s' \
+                "${hex:0:8}" "${hex:8:4}" "${hex:13:3}" "${hex:17:3}" "${hex:20:12}"
+            return 0
+        fi
+    fi
+    awk -v s="$(date +%s 2>/dev/null || echo 1)" -v p="$$" '
+    BEGIN {
+        srand(s + p * 7919)
+        h = "0123456789abcdef"
+        fmt = "xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx"
+        out = ""
+        for (i = 1; i <= length(fmt); i++) {
+            c = substr(fmt, i, 1)
+            if (c == "x") {
+                out = out substr(h, int(rand() * 16) + 1, 1)
+            } else {
+                out = out c
+            }
+        }
+        printf "%s", out
+    }'
+}
+
+detect_git_branch() {
+    local dir="$1" branch=""
+    if command -v git >/dev/null 2>&1; then
+        branch="$(GIT_CONFIG_NOSYSTEM=1 git -C "$dir" symbolic-ref --short HEAD 2>/dev/null || true)"
+    fi
+    if [ -z "$branch" ] && [ -f "$dir/.git/HEAD" ]; then
+        local head_line
+        head_line="$(head -n 1 "$dir/.git/HEAD" 2>/dev/null || true)"
+        case "$head_line" in
+            "ref: refs/heads/"*) branch="${head_line#ref: refs/heads/}" ;;
+        esac
+    fi
+    printf '%s' "${branch:-main}"
+}
+
+# Collect all registered projects into lines: <file>\t<id>\t<name>\t<decoded_path>
+read_registered_projects() {
+    [ -d "$PROJECTS_DIR" ] || return 0
+    local f base parsed pid pname puri ppath
+    for f in "$PROJECTS_DIR"/*.json; do
+        [ -f "$f" ] || continue
+        base="$(basename "$f")"
+        [ "$base" = "outside-of-project.json" ] && continue
+        parsed="$(parse_project_file "$f")"
+        pid="${parsed%%	*}"
+        local rest="${parsed#*	}"
+        pname="${rest%%	*}"
+        puri="${rest#*	}"
+        [ -n "$pid" ] || pid="${base%.json}"
+        ppath=""
+        if [ -n "$puri" ]; then
+            ppath="$(uri_decode_path "$puri")"
+        fi
+        printf '%s\t%s\t%s\t%s\n' "$f" "$pid" "$pname" "$ppath"
+    done
+}
+
+cmd_list() {
+    local as_json=0
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            --json) as_json=1 ;;
+            -h|--help) usage; return 0 ;;
+            *) printf 'agy-projects: unknown option: %s\n' "$1" >&2; return 2 ;;
+        esac
+        shift
+    done
+
+    if [ "$as_json" -eq 1 ]; then
+        printf '['
+        local first=1 f pid pname ppath
+        while IFS=$'\t' read -r f pid pname ppath; do
+            [ -n "$pid" ] || continue
+            [ "$first" -eq 1 ] || printf ','
+            first=0
+            printf '{"id":"%s","name":"%s","path":"%s"}' \
+                "$(json_escape "$pid")" \
+                "$(json_escape "$pname")" \
+                "$(json_escape "$ppath")"
+        done < <(read_registered_projects)
+        printf ']\n'
+        return 0
+    fi
+
+    local f pid pname ppath
+    while IFS=$'\t' read -r f pid pname ppath; do
+        [ -n "$pid" ] || continue
+        printf '%s\t%s\t%s\n' "$pid" "$pname" "$ppath"
+    done < <(read_registered_projects)
+}
+
+cmd_scan() {
+    local scan_dir="$DEFAULT_SCAN_DIR" show_all=0
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            --all) show_all=1 ;;
+            -h|--help) usage; return 0 ;;
+            -*) printf 'agy-projects: unknown option: %s\n' "$1" >&2; return 2 ;;
+            *) scan_dir="$1" ;;
+        esac
+        shift
+    done
+
+    scan_dir="$(normalize_path "$scan_dir")"
+    if [ ! -d "$scan_dir" ]; then
+        printf 'agy-projects: directory not found: %s\n' "$scan_dir" >&2
+        return 1
+    fi
+
+    local loaded_paths=""
+    local f pid pname ppath
+    while IFS=$'\t' read -r f pid pname ppath; do
+        [ -n "$ppath" ] && loaded_paths+="$ppath"$'\n'
+    done < <(read_registered_projects)
+
+    local d abs name kind status
+    for d in "$scan_dir"/*; do
+        [ -d "$d" ] || continue
+        name="$(basename "$d")"
+        case "$name" in
+            .*|*.tmp) continue ;;
+        esac
+        abs="$(normalize_path "$d")"
+        if [ -e "$abs/.git" ]; then
+            kind="git"
+        else
+            kind="folder"
+        fi
+        if printf '%s' "$loaded_paths" | grep -Fxq -- "$abs"; then
+            status="loaded"
+        else
+            status="new"
+        fi
+        if [ "$show_all" -eq 1 ] || [ "$status" = "new" ]; then
+            printf '%s\t%s\t%s\t%s\n' "$status" "$kind" "$name" "$abs"
+        fi
+    done
+}
+
+cmd_add() {
+    local custom_name="" dirs=()
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            --name)
+                [ "$#" -ge 2 ] || { printf 'agy-projects: --name requires a value\n' >&2; return 2; }
+                custom_name="$2"
+                shift 2
+                ;;
+            -h|--help) usage; return 0 ;;
+            -*) printf 'agy-projects: unknown option: %s\n' "$1" >&2; return 2 ;;
+            *) dirs+=("$1"); shift ;;
+        esac
+    done
+
+    if [ "${#dirs[@]}" -eq 0 ]; then
+        printf 'agy-projects: add requires at least one directory path\n' >&2
+        return 2
+    fi
+
+    mkdir -p "$PROJECTS_DIR" || { printf 'agy-projects: cannot create %s\n' "$PROJECTS_DIR" >&2; return 1; }
+    local outside="$PROJECTS_DIR/outside-of-project.json"
+    [ -f "$outside" ] || printf '{}\n' > "$outside"
+
+    local existing_rows
+    existing_rows="$(read_registered_projects)"
+
+    local raw abs dup_row existing_id existing_name pname uri uuid now_iso branch tmp out rc=0
+    for raw in "${dirs[@]}"; do
+        abs="$(normalize_path "$raw")"
+        if [ ! -d "$abs" ]; then
+            printf 'agy-projects: directory not found: %s\n' "$raw" >&2
+            rc=1
+            continue
+        fi
+
+        dup_row="$(printf '%s\n' "$existing_rows" | awk -F'\t' -v p="$abs" '$4 == p { print; exit }')"
+        if [ -n "$dup_row" ]; then
+            existing_id="$(printf '%s' "$dup_row" | cut -f2)"
+            existing_name="$(printf '%s' "$dup_row" | cut -f3)"
+            printf 'exists\t%s\t%s\t%s\n' "$existing_id" "$existing_name" "$abs"
+            continue
+        fi
+
+        if [ -n "$custom_name" ] && [ "${#dirs[@]}" -eq 1 ]; then
+            pname="$custom_name"
+        else
+            pname="$(basename "$abs")"
+            [ -n "$pname" ] && [ "$pname" != "/" ] || pname="project"
+        fi
+
+        uri="$(uri_encode_path "$abs")"
+        uuid="$(gen_uuid)"
+        now_iso="$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date +"%Y-%m-%dT%H:%M:%SZ")"
+        tmp="$PROJECTS_DIR/.${uuid}.tmp"
+        out="$PROJECTS_DIR/${uuid}.json"
+
+        if [ -e "$abs/.git" ]; then
+            branch="$(detect_git_branch "$abs")"
+            cat > "$tmp" <<EOF
+{
+  "id": "$(json_escape "$uuid")",
+  "name": "$(json_escape "$pname")",
+  "projectResources": {
+    "resources": [
+      {
+        "gitFolder": {
+          "folderUri": "$(json_escape "$uri")",
+          "defaultBranch": "$(json_escape "$branch")"
+        }
+      }
+    ]
+  },
+  "isWorkspaceOnly": false,
+  "settings": {},
+  "updatedAt": "$now_iso"
+}
+EOF
+        else
+            cat > "$tmp" <<EOF
+{
+  "id": "$(json_escape "$uuid")",
+  "name": "$(json_escape "$pname")",
+  "projectResources": {
+    "resources": [
+      {
+        "folderUri": "$(json_escape "$uri")"
+      }
+    ]
+  },
+  "isWorkspaceOnly": false,
+  "settings": {},
+  "updatedAt": "$now_iso"
+}
+EOF
+        fi
+
+        if mv -f "$tmp" "$out"; then
+            printf 'added\t%s\t%s\t%s\n' "$uuid" "$pname" "$abs"
+            existing_rows+="$out"$'\t'"$uuid"$'\t'"$pname"$'\t'"$abs"$'\n'
+        else
+            rm -f "$tmp"
+            printf 'agy-projects: failed writing %s\n' "$out" >&2
+            rc=1
+        fi
+    done
+    return "$rc"
+}
+
+cmd_remove() {
+    if [ "$#" -lt 1 ]; then
+        printf 'agy-projects: remove requires <id|name|path>\n' >&2
+        return 2
+    fi
+
+    local rows rc=0 query norm_q matched f pid pname ppath
+    rows="$(read_registered_projects)"
+
+    for query in "$@"; do
+        if [ "$query" = "outside-of-project" ] || [ "$query" = "outside-of-project.json" ]; then
+            printf 'agy-projects: refusing to remove outside-of-project\n' >&2
+            rc=1
+            continue
+        fi
+        norm_q="$(normalize_path "$query")"
+        matched=0
+        while IFS=$'\t' read -r f pid pname ppath; do
+            [ -n "$f" ] || continue
+            if [ "$pid" = "$query" ] || [ "$pname" = "$query" ] || [ "$ppath" = "$norm_q" ]; then
+                if rm -f "$f"; then
+                    printf 'removed\t%s\t%s\t%s\n' "$pid" "$pname" "$ppath"
+                    matched=1
+                else
+                    printf 'agy-projects: failed removing %s\n' "$f" >&2
+                    rc=1
+                fi
+            fi
+        done <<< "$rows"
+        if [ "$matched" -eq 0 ]; then
+            printf 'agy-projects: not found: %s\n' "$query" >&2
+            rc=1
+        fi
+    done
+    return "$rc"
+}
+
+main() {
+    local cmd="${1:-help}"
+    shift 2>/dev/null || true
+    case "$cmd" in
+        list) cmd_list "$@" ;;
+        scan) cmd_scan "$@" ;;
+        add) cmd_add "$@" ;;
+        remove|rm) cmd_remove "$@" ;;
+        help|-h|--help) usage ;;
+        *)
+            printf 'agy-projects: unknown command: %s\n' "$cmd" >&2
+            usage >&2
+            exit 2
+            ;;
+    esac
+}
+
+main "$@"

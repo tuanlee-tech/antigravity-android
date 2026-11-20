@@ -56,7 +56,7 @@ sequenceDiagram
 web/
 ├── build.sh                      # Баш-оркестратор сборщика фрагментов и патчера
 ├── src.manifest                  # Декларативный манифест сборки web/generated/**
-├── patch_main.py                 # Патчер upstream main.js (Desktop Mode + монохромное Eza)
+├── patch_main.py                 # Патчер upstream main.js (Desktop Mode, UI Scale, Folder Picker)
 ├── index.html                    # Корневой HTML-шаблон хоста приложения
 ├── main.js                       # Исходный (upstream) обфусцированный бандл React UI (~9.9 МБ)
 ├── jetbox.css                    # Стили специфичных контролов и терминала
@@ -184,6 +184,8 @@ web/
   - `touch-action: manipulation` на кнопках, ссылках и инпутах отключает браузерную 300-миллисекундную задержку двойного тапа.
   - `visualViewport.addEventListener('resize')` динамически пересчитывает переменную `--agy-vvh` в пикселях, предотвращая дергание поля чата при выезде клавиатуры IME.
   - Выборочный `transform: translateZ(0)` форсирует GPU-слои только для ключевых контейнеров скролла (`chat-container`, `.scrollable`), предотвращая исчерпание видеопамяти и зависания RenderThread на чипах ARM Mali.
+  - `ui_polish.js`: полировка мобильной палитры Dark (`#0e1014`) / Light (`#ffffff`) для `body.theme-dark` / `body.theme-light`, стилей панели быстрого перехода в диалоге выбора папки (`.agy-folder-shortcuts`) и скруглений модальных окон.
+- **`patch_main.py` (Folder Picker):** переводит начальный каталог диалога *New Project* с `$HOME` на `/storage/emulated/0/Documents` (с fallback на `/storage/emulated/0`) и добавляет кнопки быстрого перехода (`Documents`, `Downloads`, `Storage`, `System Picker`).
 - **`touch_model_menu.js`**:
   - Выпадающий список выбора моделей Antigravity в библиотеке Base UI открывает меню уровней размышления (Low / Medium / High) исключительно по hover-событию мыши.
   - На сенсорном экране тап приводил к мгновенному выбору модели по умолчанию без раскрытия настроек.

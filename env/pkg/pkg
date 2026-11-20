@@ -70,12 +70,14 @@ install_one() {
     local pkg_files
     pkg_files="$(deb_files "$cache")"
     # Rewrite every Termux prefix only in the freshly extracted files (bin/helpers,
-    # dpkg .list, python/npm console scripts) before recording the package.
+    # dpkg .list, python/npm console scripts) and patch ELF SHELL_PATH without Python.
     if [ -n "$pkg_files" ]; then
         printf '%s\n' "$pkg_files" | sed "s|^|$PREFIX/|" | rewrite_prefix
+        printf '%s\n' "$pkg_files" | grep -E '^(bin|libexec)/' | sed "s|^|$PREFIX/|" | patch_elf_shell || true
         printf '%s\n' "$pkg_files" | db_put "$name" "$ver" "$arch"
     else
         rewrite_prefix "$PREFIX"
+        patch_elf_shell "$PREFIX/bin" "$PREFIX/libexec/git-core" || true
         printf '' | db_put "$name" "$ver" "$arch"
     fi
     # Auto-generate runtime bridge only for newly installed binaries in this package
@@ -105,6 +107,14 @@ export LD_LIBRARY_PATH="\$PREFIX/lib"
 export PATH="\$PREFIX/bin:/system/bin"
 export OPENSSL_CONF="\$PREFIX/etc/tls/openssl.cnf"
 export SSL_CERT_FILE="\$PREFIX/etc/tls/cert.pem"
+export CURL_CA_BUNDLE="\$PREFIX/etc/tls/cert.pem"
+export GIT_SSL_CAINFO="\$PREFIX/etc/tls/cert.pem"
+export GIT_CONFIG_NOSYSTEM=1
+export GIT_ATTR_NOSYSTEM=1
+export GIT_TEMPLATE_DIR="\$PREFIX/share/git-core/templates"
+export GIT_EXEC_PATH="\$PREFIX/libexec/git-core"
+export PAGER="cat"
+export GODEBUG="netdns=cgo"
 exec "\$PREFIX/bin/$bname" "\$@"
 EOF
                         chmod 755 "$runtime_bin/$bname" 2>/dev/null || true

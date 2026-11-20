@@ -73,10 +73,18 @@ No PRoot, chroot, or virtualization overhead. Antigravity runs **bare-metal insi
 
 ---
 
+### Built-in Agent Skills & Live Sidebar CLI
+
+Antigravity seeds three interactive skills into `~/.gemini/config/skills/` and ships `agy-projects`:
+
+- **`/android-setup`:** One-shot Bionic toolchain setup (`git`, `python`, `nodejs`, `gh`), automated headless GitHub device auth, `~/.git-credentials` sync, and initial clone.
+- **`/github-clone`:** Interactive GitHub repository browser/filter (using `ask_question`) that clones or fetches directly into `/storage/emulated/0/Documents/<repo>` and registers it in the sidebar.
+- **`/load-projects`:** Batch-scans `/storage/emulated/0/Documents` (or custom folders) and adds/removes entries live in the **Projects** sidebar via `agy-projects` (`list`, `scan`, `add`, `remove`).
+
 ### Cloning Private GitHub Repositories
 
 > [!TIP]
-> You don't need to copy these commands manually — just type **`/android-setup`** (or ask in chat: *"setup GitHub and clone my private repo"*) and Antigravity will guide you step-by-step using the built-in `android-setup` skill.
+> You don't need to copy these commands manually — just type **`/android-setup`** (to install tools & log in) or **`/github-clone`** (to browse & clone repos), and **`/load-projects`** to load existing folders into the sidebar.
 
 Because non-interactive commands run without terminal prompts (`GIT_TERMINAL_PROMPT=0`), authenticate Git once inside the built-in terminal before cloning or pushing private repositories (choose one method):
 

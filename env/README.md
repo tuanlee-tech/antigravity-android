@@ -26,8 +26,9 @@ env/
 ├── overlay/                # Наложение файлов поверх $PREFIX (etc, bin, lib)
 │   ├── bin/                # Системные скрипты и утилиты AGY
 │   │   ├── agy-daemon      # Фоновый автономный диспетчер задач и планировщик
-│   │   ├── agy-fix-paths   # Утилита динамической нормализации шебангов и путей
+│   │   ├── agy-fix-paths   # Утилита динамической нормализации шебангов, путей и ELF git shell
 │   │   ├── agy-notify      # Утилита управления системными уведомлениями Android
+│   │   ├── agy-projects    # Утилита управления проектами боковой панели (list/scan/add/remove)
 │   │   ├── agy-upgrade     # Менеджер безопасного обновления, бэкапа и миграций
 │   │   ├── rish            # Клиент Shizuku для привилегированного шелла (uid=2000)
 │   │   └── cs              # Заглушка для language server
@@ -141,10 +142,11 @@ env/
 └─────────────────────────────────────────────────────────────┘
 ```
 
-1. **`TermuxShebangRewriter` & `TermuxPrefixRewriter` (Java):** При установке или обновлении приложения сканируются каталоги `bin`, `libexec`, `etc`, `share`, `var`. Все текстовые вхождения регулярного выражения `/data/(?:data|user/[0-9]+)/[^/]+/files/usr` заменяются на активный `$PREFIX`.
+1. **`TermuxShebangRewriter`, `TermuxPrefixRewriter` & `TermuxElfShellPatcher` (Java):** При установке или обновлении приложения сканируются каталоги `bin`, `libexec`, `etc`, `share`, `var`. Текстовые пути Termux заменяются на активный `$PREFIX`, а в ELF-бинарниках (`git`, `git-remote-http`) строка `/data/data/com.termux/files/usr/bin/sh\0` (39 байт) заменяется in-place на `/system/bin/sh\0` с дополнением `\0` без внешних интерпретаторов.
 2. **`TermuxSymlinkFixer` (Java):** Абсолютные символические ссылки, указывающие на несуществующий префикс `com.termux`, динамически пересоздаются с указанием на локальный `$PREFIX`.
 3. **`libtermux-exec.so` (C / Bionic Hook):** Библиотека внедряется через `LD_PRELOAD` во все дочерние процессы шелла (через `00-env.sh`). Она перехватывает семейство функций `execve`, `execvp`, `fexecve`, подменяя вызовы `/bin/sh` и устаревшие пути Termux на исполняемые файлы активного `$PREFIX/bin`.
-4. **`agy-fix-paths` & `pkg rewrite_prefix` (Bash):** При установке пакетов через `pkg` или установке глобальных CLI-утилит через `pip install` / `npm install -g`, скрипты содержат пути интерпретаторов. `agy-fix-paths` производит безопасное сканирование только текстовых файлов (пропуская бинарники и ELF) и атомарно заменяет пути на текущий `$PREFIX`.
+4. **`agy-fix-paths`, `pkg rewrite_prefix` & `patch_elf_shell` (Bash):** При установке пакетов через `pkg` или установке глобальных CLI-утилит через `pip install` / `npm install -g`, текстовые пути нормализуются под текущий `$PREFIX`, а бинарники ELF (`git` и др.) патчатся чистым Bash (`grep -aobF` + `dd conv=notrunc`) без зависимости от `python3`.
+5. **`agy-projects` (Bash + AWK):** Управляет проектами в `$HOME/.gemini/config/projects/*.json` по схеме `exa.project_pb.Project`, позволяя загружать и удалять папки в боковой панели на лету.
 
 ---
 

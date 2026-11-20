@@ -21,6 +21,18 @@ TRIM_PREFIXES = (
     "libexec/installed-tests/",
 )
 
+TERMUX_ELF_SHELL = b"/data/data/com.termux/files/usr/bin/sh\x00"
+ANDROID_ELF_SHELL = b"/system/bin/sh\x00".ljust(len(TERMUX_ELF_SHELL), b"\x00")
+
+
+def patch_elf_shell_bytes(data: bytes) -> bytes:
+    """Replace hardcoded Termux SHELL_PATH in ELF binaries while keeping size fixed."""
+    if data[:4] == b"\x7fELF" and TERMUX_ELF_SHELL in data:
+        patched = data.replace(TERMUX_ELF_SHELL, ANDROID_ELF_SHELL)
+        if len(patched) == len(data):
+            return patched
+    return data
+
 
 def read_ar_members(deb_path):
     members = {}
@@ -104,8 +116,10 @@ def extract_deb_into_bootstrap(deb_path, dest, trim, new_sl_lines):
                 added_links += 1
             elif m.isfile():
                 os.makedirs(os.path.dirname(target_path), exist_ok=True)
-                with tar.extractfile(m) as src, open(target_path, "wb") as dst:
-                    shutil.copyfileobj(src, dst)
+                with tar.extractfile(m) as src:
+                    payload = patch_elf_shell_bytes(src.read())
+                with open(target_path, "wb") as dst:
+                    dst.write(payload)
                 mode = m.mode & 0o7777
                 if mode:
                     os.chmod(target_path, mode)

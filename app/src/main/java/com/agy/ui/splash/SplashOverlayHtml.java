@@ -2,6 +2,8 @@ package com.agy.ui.splash;
 
 import android.webkit.WebView;
 
+import com.agy.runtime.RuntimeConfig;
+
 /** Renders status/failure overlays whose Retry button calls window.SplashRetry. */
 public final class SplashOverlayHtml {
 
@@ -24,6 +26,7 @@ public final class SplashOverlayHtml {
                                         boolean retryable) {
         String safeTitle = escape(title == null ? "Antigravity" : title);
         String safe = escape(message == null ? "unknown error" : message);
+        String safeVer = escape("v" + RuntimeConfig.APP_VERSION_NAME);
         String button = retryable
                 ? "  <div class=\"btn-group\">\n"
                 + "    <button class=\"btn retry\" onclick=\"agyRetry()\">Retry</button>\n"
@@ -86,12 +89,23 @@ public final class SplashOverlayHtml {
                 + "    border: 1px solid " + foregroundColor + ";\n"
                 + "    opacity: 0.85;\n"
                 + "  }\n"
+                + "  .version-footer {\n"
+                + "    position: fixed;\n"
+                + "    left: 50%;\n"
+                + "    bottom: 24px;\n"
+                + "    transform: translateX(-50%);\n"
+                + "    font-size: 11px;\n"
+                + "    letter-spacing: 0.04em;\n"
+                + "    font-variant-numeric: tabular-nums;\n"
+                + "    opacity: 0.5;\n"
+                + "  }\n"
                 + "</style>\n"
                 + "</head>\n"
                 + "<body>\n"
                 + "  <div class=\"title\">" + safeTitle + "</div>\n"
                 + "  <div class=\"msg\">" + safe + "</div>\n"
                 + button
+                + "  <div class=\"version-footer\">" + safeVer + "</div>\n"
                 + "  <script>\n"
                 + "    function agyRetry() {\n"
                 + "      if (window.SplashRetry && window.SplashRetry.retry) {\n"

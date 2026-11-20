@@ -48,9 +48,12 @@
 
 ---
 
-## 3. Package Management (`pkg`)
+## 3. Package Management (`pkg`) & Built-in Skills
 
-AGY bundles a default global skill at `~/.gemini/config/skills/android-setup/SKILL.md` (`/android-setup`) to guide users through installing the `pkg` toolchain and authenticating/cloning private GitHub repositories interactively.
+AGY bundles three default global skills in `~/.gemini/config/skills/` and a live sidebar CLI (`agy-projects`):
+- **`/android-setup`** (`skills/android-setup/SKILL.md`): Fast-track bootstrap for `pkg` tools (`git`, `python`, `nodejs`, `gh`), headless GitHub device login, credential sync, and initial clone.
+- **`/github-clone`** (`skills/github-clone/SKILL.md`): Interactive GitHub repository browser/filter and cloner to `/storage/emulated/0/Documents/<repo>` with automatic sidebar registration.
+- **`/load-projects`** (`skills/load-projects/SKILL.md`): Batch scan folders in `/storage/emulated/0/Documents` (or custom dirs) and load/remove them in the Projects sidebar via `agy-projects` (`list`, `scan`, `add`, `remove`).
 
 AGY includes an ultra-fast, native package manager (`pkg`) written in Bash & AWK:
 
@@ -166,9 +169,9 @@ agy-daemon clear
 ### Android Status Notifications (`agy-notify`)
 Post or manage notifications directly in the Android status bar:
 ```bash
-agy-notify post -t "Build Finished" -m "Tests passed without errors"
+agy-notify post -t "Build Finished" -m "Tests passed without errors" --tag build-status
 agy-notify list
-agy-notify cancel -t "Build Finished"
+agy-notify cancel build-status
 ```
 
 ---

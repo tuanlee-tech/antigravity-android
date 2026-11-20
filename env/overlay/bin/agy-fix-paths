@@ -54,4 +54,71 @@ while IFS= read -r -d '' f; do
     fi
 done < <(grep -rIlZ -E -m 1 -e '^#! */usr/bin/env' -- "${targets[@]}" 2>/dev/null)
 
+# 3. Patch hardcoded Termux SHELL_PATH inside ELF binaries (e.g. git, git-remote-http)
+#    without requiring Python: replace /data/data/com.termux/files/usr/bin/sh\0 (39B)
+#    in-place with NUL-padded /system/bin/sh\0 (39B).
+_patch_elf_shell() {
+    local f="$1"
+    [ -f "$f" ] && [ ! -L "$f" ] || return 0
+    local elf_magic=$'\x7fELF'
+    local magic
+    magic="$(LC_ALL=C dd if="$f" bs=4 count=1 2>/dev/null)" || return 0
+    [ "$magic" = "$elf_magic" ] || return 0
+
+    local old_str="/data/data/com.termux/files/usr/bin/sh"
+    local offsets
+    offsets="$(LC_ALL=C grep -aobF "$old_str" "$f" 2>/dev/null | cut -d: -f1)" || return 0
+    [ -n "$offsets" ] || return 0
+
+    local size_before
+    size_before="$(wc -c < "$f" | tr -d ' ')"
+    [ -n "$size_before" ] && [ "$size_before" -ge 39 ] || return 0
+
+    local tmp="$f.agyelf.$$"
+    cp -f "$f" "$tmp" 2>/dev/null || { rm -f "$tmp"; return 0; }
+
+    local off patched_any=0
+    while IFS= read -r off; do
+        [ -n "$off" ] || continue
+        [ $((off + 39)) -le "$size_before" ] || continue
+        local nul_check
+        nul_check="$(LC_ALL=C dd if="$tmp" bs=1 skip=$((off + 38)) count=1 2>/dev/null | tr -d '\000' | wc -c | tr -d ' ')"
+        [ "$nul_check" = "0" ] || continue
+        {
+            printf '/system/bin/sh'
+            dd if=/dev/zero bs=1 count=25 2>/dev/null
+        } | dd of="$tmp" bs=1 seek="$off" conv=notrunc 2>/dev/null || continue
+        patched_any=1
+    done <<< "$offsets"
+
+    if [ "$patched_any" -eq 1 ]; then
+        local size_after
+        size_after="$(wc -c < "$tmp" | tr -d ' ')"
+        if [ "$size_after" = "$size_before" ]; then
+            local mode
+            mode="$(stat -c '%a' "$f" 2>/dev/null)" || mode=""
+            [ -n "$mode" ] && chmod "$mode" "$tmp" 2>/dev/null || true
+            mv -f "$tmp" "$f"
+            count=$((count + 1))
+            return 0
+        fi
+    fi
+    rm -f "$tmp"
+}
+
+_patch_elf_shell "$PREFIX/bin/git"
+_patch_elf_shell "$PREFIX/libexec/git-core/git-remote-http"
+for t in "${targets[@]}"; do
+    if [ -f "$t" ]; then
+        _patch_elf_shell "$t"
+    elif [ -d "$t" ]; then
+        for sub in "$t/bin" "$t/libexec/git-core"; do
+            [ -d "$sub" ] || continue
+            for candidate in "$sub"/*; do
+                [ -f "$candidate" ] && _patch_elf_shell "$candidate"
+            done
+        done
+    fi
+done
+
 printf 'agy-fix-paths: rewrote %d file(s) -> %s\n' "$count" "$PREFIX"

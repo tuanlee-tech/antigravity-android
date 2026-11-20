@@ -1,4 +1,4 @@
-# Antigravity cho Android v2.4.5
+# Antigravity cho Android v2.4.6
 
 ## Danh sách gói phát hành
 
@@ -7,6 +7,25 @@
 | **`antigravity.apk`** | `com.agy` | 45157 | Bản tiêu chuẩn giữ nguyên cơ chế kiểm tra tài khoản của Google. |
 | **`antigravity-region-bypass.apk`** | `com.agy` | 45157 | Bản bỏ qua kiểm tra điều kiện tài khoản/vùng (yêu cầu VPN/tunnel nếu cần). |
 | **`SHA256SUMS.txt`** | — | — | Mã kiểm tra toàn vẹn SHA-256 cho các tệp APK. |
+
+---
+
+## Thay đổi & Sửa lỗi (v2.4.6)
+
+### 1. Vá ELF `git` không phụ thuộc Python & đồng bộ bridge của `pkg`
+* **Tận gốc nhiều lớp (Java + Bash thuần):** Bổ sung `TermuxElfShellPatcher.java` (gọi khi cài/nâng cấp APK trong `EnvInstaller`), hàm `patch_elf_shell` trong `pkg` (hook ngay sau `pkg install`) và Bước 3 trong `agy-fix-paths` dùng `grep -aobF` + `dd conv=notrunc` thay in-place `/data/data/com.termux/files/usr/bin/sh\0` → `/system/bin/sh\0` (giữ nguyên 39 byte) cho `git` & `git-remote-http` mà **không cần cài `python3`**.
+* **Sửa template bridge của `pkg`:** Bổ sung `GODEBUG="netdns=cgo"`, `CURL_CA_BUNDLE`, `GIT_SSL_CAINFO`, `GIT_CONFIG_NOSYSTEM=1`, `GIT_ATTR_NOSYSTEM=1`, `GIT_TEMPLATE_DIR`, `GIT_EXEC_PATH` và `PAGER="cat"` ngay khi `pkg install` tạo wrapper trong `runtime/bin`.
+
+### 2. Nâng cấp `/android-setup` v2 & bổ sung `/github-clone`, `/load-projects`, `agy-projects`
+* **`/android-setup` v2 (Fast Track):** Gom bước cài gói vào 1 lệnh duy nhất (chỉ cài gói còn thiếu), chạy `gh auth login` ngầm và ghim mã qua `agy-notify --tag gh-auth`, đồng bộ token sang `~/.git-credentials` (`credential.helper store`), loại bỏ các lượt thử `am start`/`rish` lỗi.
+* **`/github-clone`:** Duyệt nhanh top 10 repo trên GitHub bằng `ask_question` (kèm lọc theo từ khóa/org hoặc nhập URL tùy chỉnh), tự `git fetch` nếu repo đã tồn tại, clone vào `/storage/emulated/0/Documents/<repo>` và nạp thẳng vào Sidebar.
+* **`/load-projects` & CLI `agy-projects`:** Công cụ dòng lệnh thuần Bash + AWK (`agy-projects list | scan | add | remove`) ghi trực tiếp tệp JSON theo schema `exa.project_pb.Project` vào `~/.gemini/config/projects/` để cập nhật **Projects Sidebar tức thì (live)** không cần khởi động lại ứng dụng.
+* **`OnboardingSeeder` & `AGENTS.md`:** Sửa ví dụ `agy-notify cancel <tag>`, cập nhật mô tả 3 skill + `agy-projects` trên cả 3 bản `AGENTS.md`, và nâng cấp `OnboardingSeeder` tự động cập nhật `AGENTS.md` lẫn `android-setup/SKILL.md` khi nâng cấp APK nếu người dùng chưa chỉnh sửa thủ công.
+
+### 3. Sửa nút `New Project` mặc định mở `Documents` & làm đẹp giao diện Splash / Mobile UI
+* **Folder Picker thông minh hơn:** Nút **New Project** mặc định mở thẳng `/storage/emulated/0/Documents` (thay vì `/data/user/0/com.agy/files/`), đặt modal cao thoáng phía trên bàn phím, bổ sung thanh phím tắt nhanh (`Documents`, `Downloads`, `Storage`, `System Picker`) và gắn `DocumentsContract.EXTRA_INITIAL_URI` cho Android SAF Picker trên API 26+.
+* **Splash Screen mới có số phiên bản:** Hiển thị logo Antigravity, 3 chấm loading mượt và badge phiên bản (`v2.4.6`) ở đáy màn hình chờ (hỗ trợ cả Dark & Light).
+* **Mobile UI Polish:** Làm sâu bảng màu Dark (`#0e1014`) và Light (`#ffffff`) sạch sẽ sắc nét theo phong cách v2.33.0 cùng viền mảnh và thanh cuộn gọn gàng qua `web/src/patches/web_optimizations/ui_polish.js`.
 
 ---
 

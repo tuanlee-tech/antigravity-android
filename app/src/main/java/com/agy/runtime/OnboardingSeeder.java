@@ -25,6 +25,12 @@ public final class OnboardingSeeder {
     private static final String SEED_HASHES_FILE = ".seed-hashes.properties";
     private static final String V244_ANDROID_SETUP_SHA =
             "f95c1ad79bff39a797ad1d871525eb0cea0bb4861517c2882ef9214cf64214eb";
+    private static final String V245_ANDROID_SETUP_SHA =
+            "f135c648678a4d14323790ca4b29b02216ae3a7738562792e7ee5bfb7e245d69";
+    private static final String V244_AGENTS_LF_SHA =
+            "bf826373f8ada62f996041c7f459d97b2dbf2be3c6e0893cbe576cd8dfc336f8";
+    private static final String V244_AGENTS_CRLF_SHA =
+            "f649c14c6438a8a4ee23ba3174c3ba5c2d7a7154b6fcc1550322ba16dac275a8";
 
     private OnboardingSeeder() {
     }
@@ -42,11 +48,19 @@ public final class OnboardingSeeder {
             // Seed default agent rules (AGENTS.md) and built-in skills into ~/.gemini/config/
             File configDir = projects.getParentFile();
             if (configDir != null && (configDir.isDirectory() || configDir.mkdirs())) {
-                seedStateFile(appContext, "AGENTS.md", new File(configDir, "AGENTS.md"));
                 File skillsDir = new File(configDir, "skills");
                 File hashStore = new File(skillsDir, SEED_HASHES_FILE);
                 Properties seedHashes = loadSeedHashes(hashStore);
-                boolean hashesChanged = seedSkillTree(appContext, "skills", skillsDir, seedHashes);
+                boolean hashesChanged = seedManagedFile(
+                        appContext,
+                        "AGENTS.md",
+                        new File(configDir, "AGENTS.md"),
+                        seedHashes,
+                        V244_AGENTS_LF_SHA,
+                        V244_AGENTS_CRLF_SHA);
+                if (seedSkillTree(appContext, "skills", skillsDir, seedHashes)) {
+                    hashesChanged = true;
+                }
                 if (hashesChanged) {
                     saveSeedHashes(hashStore, seedHashes);
                 }
@@ -73,7 +87,11 @@ public final class OnboardingSeeder {
         String fullAssetPath = RuntimePaths.SEED_ASSET + "/" + assetRelPath;
         String[] children = appContext.getAssets().list(fullAssetPath);
         if (children == null || children.length == 0) {
-            return seedSkillFile(appContext, assetRelPath, target, seedHashes);
+            if ("skills/android-setup/SKILL.md".equals(assetRelPath)) {
+                return seedManagedFile(appContext, assetRelPath, target, seedHashes,
+                        V244_ANDROID_SETUP_SHA, V245_ANDROID_SETUP_SHA);
+            }
+            return seedManagedFile(appContext, assetRelPath, target, seedHashes);
         }
         if (!target.isDirectory() && !target.mkdirs()) {
             Log.w(TAG, "cannot create skill dir: " + target);
@@ -88,8 +106,9 @@ public final class OnboardingSeeder {
         return changed;
     }
 
-    private static boolean seedSkillFile(
-            Context appContext, String assetRelPath, File target, Properties seedHashes)
+    private static boolean seedManagedFile(
+            Context appContext, String assetRelPath, File target, Properties seedHashes,
+            String... legacyKnownHashes)
             throws Exception {
         String content;
         try (InputStream in = appContext.getAssets().open(RuntimePaths.SEED_ASSET + "/" + assetRelPath)) {
@@ -108,11 +127,17 @@ public final class OnboardingSeeder {
                 }
                 return false;
             }
-            boolean isKnownStock = existingHash.equals(recordedHash)
-                    || ("skills/android-setup/SKILL.md".equals(assetRelPath)
-                            && V244_ANDROID_SETUP_SHA.equals(existingHash));
+            boolean isKnownStock = existingHash.equals(recordedHash);
+            if (!isKnownStock && legacyKnownHashes != null) {
+                for (String legacyHash : legacyKnownHashes) {
+                    if (legacyHash != null && legacyHash.equals(existingHash)) {
+                        isKnownStock = true;
+                        break;
+                    }
+                }
+            }
             if (!isKnownStock) {
-                Log.i(TAG, "skill customized by user; left untouched: " + target);
+                Log.i(TAG, "managed file customized by user; left untouched: " + target);
                 return false;
             }
         }
@@ -124,7 +149,7 @@ public final class OnboardingSeeder {
         }
         AtomicFileWriter.writeText(target, content);
         seedHashes.setProperty(assetRelPath, newHash);
-        Log.i(TAG, "seeded/updated stock skill: " + target);
+        Log.i(TAG, "seeded/updated stock file: " + target);
         return true;
     }
 

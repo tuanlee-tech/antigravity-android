@@ -7,6 +7,7 @@ import android.view.View;
 import android.webkit.WebView;
 import android.widget.FrameLayout;
 
+import com.agy.runtime.RuntimeConfig;
 import com.agy.theme.ThemeManager;
 
 /**
@@ -60,7 +61,7 @@ public final class SplashController {
     /** First render of the loading splash (before any show* call). */
     public void loadInitial() {
         mode = MODE_LOADING;
-        SplashLoadingHtml.load(view, foreground(), background());
+        SplashLoadingHtml.load(view, foreground(), background(), RuntimeConfig.APP_VERSION_NAME);
     }
 
     /** Show the animated loading splash again (startup or post-restart ready). */
@@ -68,7 +69,7 @@ public final class SplashController {
         setVisible();
         if (mode != MODE_LOADING) {
             mode = MODE_LOADING;
-            SplashLoadingHtml.load(view, foreground(), background());
+            SplashLoadingHtml.load(view, foreground(), background(), RuntimeConfig.APP_VERSION_NAME);
         }
     }
 
@@ -141,7 +142,7 @@ public final class SplashController {
     public void refresh() {
         view.setBackgroundColor(Color.TRANSPARENT);
         if (mode == MODE_LOADING && !dismissed) {
-            SplashLoadingHtml.load(view, foreground(), background());
+            SplashLoadingHtml.load(view, foreground(), background(), RuntimeConfig.APP_VERSION_NAME);
         }
     }
 

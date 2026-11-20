@@ -74,10 +74,18 @@ Không dùng PRoot, chroot hay lớp ảo hóa. Antigravity chạy **trực ti�
 
 ---
 
+### Các Skill tích hợp sẵn & Quản lý Sidebar trực tiếp (`agy-projects`)
+
+Antigravity tự động nạp 3 skill mặc định vào `~/.gemini/config/skills/` kèm CLI `agy-projects`:
+
+- **`/android-setup`:** Cài đặt nhanh công cụ Bionic (`git`, `python`, `nodejs`, `gh`) trong 1 bước, đăng nhập GitHub ngầm qua mã xác thực thông báo và đồng bộ `~/.git-credentials`.
+- **`/github-clone`:** Duyệt, lọc và chọn repo GitHub trực quan qua `ask_question` để clone/fetch thẳng vào `/storage/emulated/0/Documents/<repo>` và tự nạp vào Sidebar.
+- **`/load-projects`:** Quét nhanh các thư mục trong `/storage/emulated/0/Documents` (hoặc thư mục bất kỳ) để chọn nhiều folder nạp/gỡ trực tiếp khỏi **Projects Sidebar** qua `agy-projects` (`list`, `scan`, `add`, `remove`) không cần khởi động lại app.
+
 ### Clone kho mã nguồn Private trên GitHub
 
 > [!TIP]
-> Bạn không cần copy thủ công các lệnh bên dưới — chỉ cần gõ **`/android-setup`** hoặc nhắn trong khung chat (*"cài môi trường và clone repo private"*), Antigravity sẽ tự đọc skill mặc định `android-setup` để hướng dẫn từng bước.
+> Bạn không cần copy thủ công các lệnh bên dưới — chỉ cần gõ **`/android-setup`** (cài môi trường & đăng nhập), **`/github-clone`** (chọn & clone repo), hoặc **`/load-projects`** (nạp nhanh thư mục vào Sidebar).
 
 Do các lệnh tự động chạy không hỏi mật khẩu trên terminal (`GIT_TERMINAL_PROMPT=0`), hãy đăng nhập Git **1 lần** trong Terminal tích hợp trước khi clone hoặc push repo private (chọn 1 trong 3 cách):
 
