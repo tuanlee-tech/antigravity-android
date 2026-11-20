@@ -66,7 +66,7 @@ No PRoot, chroot, or virtualization overhead. Antigravity runs **bare-metal insi
    * [`antigravity.apk`](https://github.com/tuanlee-tech/antigravity-android/releases/latest/download/antigravity.apk) — standard release (original Google account checks).
    * [`antigravity-region-bypass.apk`](https://github.com/tuanlee-tech/antigravity-android/releases/latest/download/antigravity-region-bypass.apk) — release with account eligibility check bypass.
 2. **Grant Storage Permission** (`All Files Access`). *(Optional: enable Shizuku for ADB access)*.
-3. **Install Runtimes** via terminal or agent:
+3. **Install Runtimes** via terminal or simply ask the agent in chat (`/android-setup` or *"install git python nodejs"*):
    ```bash
    pkg update && pkg install git python nodejs
    ```
@@ -74,6 +74,9 @@ No PRoot, chroot, or virtualization overhead. Antigravity runs **bare-metal insi
 ---
 
 ### Cloning Private GitHub Repositories
+
+> [!TIP]
+> You don't need to copy these commands manually — just type **`/android-setup`** (or ask in chat: *"setup GitHub and clone my private repo"*) and Antigravity will guide you step-by-step using the built-in `android-setup` skill.
 
 Because non-interactive commands run without terminal prompts (`GIT_TERMINAL_PROMPT=0`), authenticate Git once inside the built-in terminal before cloning or pushing private repositories (choose one method):
 

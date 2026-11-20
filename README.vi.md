@@ -67,7 +67,7 @@ Không dùng PRoot, chroot hay lớp ảo hóa. Antigravity chạy **trực ti�
    * [`antigravity.apk`](https://github.com/tuanlee-tech/antigravity-android/releases/latest/download/antigravity.apk) — bản tiêu chuẩn (giữ nguyên kiểm tra tài khoản Google).
    * [`antigravity-region-bypass.apk`](https://github.com/tuanlee-tech/antigravity-android/releases/latest/download/antigravity-region-bypass.apk) — bản bỏ qua kiểm tra giới hạn vùng/tài khoản.
 2. **Cấp quyền truy cập bộ nhớ** (`Truy cập tất cả tệp`). *(Tùy chọn: bật Shizuku nếu cần quyền ADB)*.
-3. **Cài công cụ lập trình** trong terminal hoặc qua agent:
+3. **Cài công cụ lập trình** trong terminal hoặc chỉ cần nhắn trực tiếp cho agent (`/android-setup` hoặc *"cài git python nodejs"*):
    ```bash
    pkg update && pkg install git python nodejs
    ```
@@ -75,6 +75,9 @@ Không dùng PRoot, chroot hay lớp ảo hóa. Antigravity chạy **trực ti�
 ---
 
 ### Clone kho mã nguồn Private trên GitHub
+
+> [!TIP]
+> Bạn không cần copy thủ công các lệnh bên dưới — chỉ cần gõ **`/android-setup`** hoặc nhắn trong khung chat (*"cài môi trường và clone repo private"*), Antigravity sẽ tự đọc skill mặc định `android-setup` để hướng dẫn từng bước.
 
 Do các lệnh tự động chạy không hỏi mật khẩu trên terminal (`GIT_TERMINAL_PROMPT=0`), hãy đăng nhập Git **1 lần** trong Terminal tích hợp trước khi clone hoặc push repo private (chọn 1 trong 3 cách):
 

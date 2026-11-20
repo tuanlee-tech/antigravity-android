@@ -12,12 +12,15 @@ def pack_seed(seed_dir: str, dest_seed_dir: str) -> list:
     os.makedirs(dest_seed_dir, exist_ok=True)
     
     copied = []
-    for item in sorted(os.listdir(seed_dir)):
-        src = os.path.join(seed_dir, item)
-        if os.path.isfile(src):
-            dst = os.path.join(dest_seed_dir, item)
+    for root, dirs, files in os.walk(seed_dir):
+        dirs.sort()
+        for item in sorted(files):
+            src = os.path.join(root, item)
+            rel = os.path.relpath(src, seed_dir).replace(os.sep, "/")
+            dst = os.path.join(dest_seed_dir, rel)
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
             shutil.copyfile(src, dst)
-            copied.append(item)
+            copied.append(rel)
             
     return copied
 

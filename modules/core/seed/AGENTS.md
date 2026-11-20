@@ -50,6 +50,8 @@
 
 ## 3. Package Management (`pkg`)
 
+AGY bundles a default global skill at `~/.gemini/config/skills/android-setup/SKILL.md` (`/android-setup`) to guide users through installing the `pkg` toolchain and authenticating/cloning private GitHub repositories interactively.
+
 AGY includes an ultra-fast, native package manager (`pkg`) written in Bash & AWK:
 
 - **Usage & Syntax:**

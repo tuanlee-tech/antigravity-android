@@ -9,9 +9,9 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Release Tag (e.g. v2.4.3)'
+        description: 'Release Tag (e.g. v2.4.4)'
         required: false
-        default: 'v2.4.3'
+        default: 'v2.4.4'
       draft:
         description: 'Create Draft Release'
         type: boolean
@@ -148,6 +148,8 @@ jobs:
 
             ### Key Highlights in this Release
 
+            * **Built-in `android-setup` Skill:** Automatically seeds `~/.gemini/config/skills/android-setup/SKILL.md` so users can simply type `/android-setup` or ask in chat to install `pkg` tools (`git`, `python`, `nodejs`) and authenticate/clone private GitHub repositories without copying README commands.
+            * **x86/x86_64 Emulator Diagnostics & `GIT_SSL_CAINFO` Export:** Detects unsupported x86/x86_64 PC emulator binary translation (`exit code 139`) with clear device requirement messaging, and exports `GIT_SSL_CAINFO` automatically in `ShellBridgeInstaller` bridges.
             * **Native Android Folder Picker (`window.dialog.showOpenDialog`):** Wired **New Project** and **Open Folder** directly to Android's native `ACTION_OPEN_DOCUMENT_TREE` picker via `web/src/core/dialog-bridge.js` — no more manually typing `/storage/emulated/0/...` paths.
             * **Mobile Touch UX & UI Scale:** Enlarged mobile touch targets, added live **UI Scale** selector (`100% / 115% / 125% / 140%`) in *Settings → Appearance* (defaults to `115%` on mobile), and fixed model selection so tapping a model switches immediately while tapping the right-side effort pill opens thinking effort options.
             * **Android 10 Bionic Userspace (`pkg`) Fix:** Added POSIX PAX extended header (`path`/`linkpath`) support to `TarExtractor`, created `tmp`/`home` before `bashSmokeTest`, and added `files/logs/env_install.log` diagnostics so `$HOME/usr` and `pkg` extract cleanly on Android 10.

@@ -30,10 +30,11 @@ public final class OnboardingSeeder {
             seedStateFile(appContext, "antigravity_state.pbtxt",
                     new File(appData, "antigravity_state.pbtxt"));
 
-            // Seed default agent rules (AGENTS.md) into ~/.gemini/config/AGENTS.md
+            // Seed default agent rules (AGENTS.md) and built-in skills into ~/.gemini/config/
             File configDir = projects.getParentFile();
             if (configDir != null && (configDir.isDirectory() || configDir.mkdirs())) {
                 seedStateFile(appContext, "AGENTS.md", new File(configDir, "AGENTS.md"));
+                seedSkillTree(appContext, "skills", new File(configDir, "skills"));
             }
 
             // The project store resolves its projects here; without the
@@ -51,10 +52,32 @@ public final class OnboardingSeeder {
         }
     }
 
+    private static void seedSkillTree(Context appContext, String assetRelPath, File target)
+            throws Exception {
+        String fullAssetPath = RuntimePaths.SEED_ASSET + "/" + assetRelPath;
+        String[] children = appContext.getAssets().list(fullAssetPath);
+        if (children == null || children.length == 0) {
+            seedStateFile(appContext, assetRelPath, target);
+            return;
+        }
+        if (!target.isDirectory() && !target.mkdirs()) {
+            Log.w(TAG, "cannot create skill dir: " + target);
+            return;
+        }
+        for (String child : children) {
+            seedSkillTree(appContext, assetRelPath + "/" + child, new File(target, child));
+        }
+    }
+
     private static void seedStateFile(Context appContext, String assetName, File target)
             throws Exception {
         if (target.isFile() && target.length() > 0) {
             Log.i(TAG, "state present; left untouched: " + target);
+            return;
+        }
+        File parent = target.getParentFile();
+        if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
+            Log.w(TAG, "cannot create parent dir: " + parent);
             return;
         }
         try (InputStream in = appContext.getAssets().open(

@@ -1,4 +1,4 @@
-# Antigravity cho Android v2.4.3
+# Antigravity cho Android v2.4.4
 
 ## Danh sách gói phát hành
 
@@ -7,6 +7,18 @@
 | **`antigravity.apk`** | `com.agy` | 45157 | Bản tiêu chuẩn giữ nguyên cơ chế kiểm tra tài khoản của Google. |
 | **`antigravity-region-bypass.apk`** | `com.agy` | 45157 | Bản bỏ qua kiểm tra điều kiện tài khoản/vùng (yêu cầu VPN/tunnel nếu cần). |
 | **`SHA256SUMS.txt`** | — | — | Mã kiểm tra toàn vẹn SHA-256 cho các tệp APK. |
+
+---
+
+## Thay đổi & Sửa lỗi (v2.4.4)
+
+### 1. Skill mặc định `android-setup` tích hợp sẵn
+* Đóng gói sẵn skill `android-setup` và tự động nạp vào `~/.gemini/config/skills/android-setup/SKILL.md` qua `OnboardingSeeder` + `pack_seed.py`.
+* Người dùng chỉ cần gõ **`/android-setup`** hoặc nhắn trong khung chat (ví dụ *"cài git python nodejs"* hoặc *"clone repo private"*), agent sẽ tự động kiểm tra `pkg`, cài môi trường và hướng dẫn đăng nhập GitHub (`gh` / PAT / SSH) để clone repo private mà không cần copy lệnh từ README.
+
+### 2. Sửa TLS cho Git & nhận diện giả lập x86/x86_64
+* Xuất sẵn biến `GIT_SSL_CAINFO="$PREFIX/etc/tls/cert.pem"` trong `ShellBridgeInstaller` (nâng `BRIDGE_FORMAT` lên 3).
+* Phát hiện trường hợp chạy trên giả lập PC x86/x86_64 (`exit code 139 / SIGSEGV`) trong `CoreProcessSupervisor` để hiển thị thông báo yêu cầu thiết bị ARM64 gốc.
 
 ---
 
