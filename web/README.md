@@ -165,6 +165,7 @@ web/
 | `isDesktopMode` | `() => boolean` | Проверяет, включен ли режим широкого десктопного Viewport. |
 | `setDesktopMode`| `(enabled: boolean) => void` | Динамически переключает User-Agent и Viewport WebView между мобильным и десктопным режимами. |
 | `openDirectoryPicker` | `() => void` | Запускает системный диалог выбора папки (SAF Document Tree) для открытия проекта. |
+| `notifyAgentEvent` | `(token, title, body, tag, silent) => void` | Передает уведомления Web UI (`window.Notification`) в `AgentNotifier`, когда приложение свернуто. |
 | `saveBlob` | `(token, base64, filename, mime) => void` | Безопасное сохранение сгенерированных веб-интерфейсом блобов в хранилище `Downloads`. |
 
 ---
@@ -184,7 +185,8 @@ web/
   - `touch-action: manipulation` на кнопках, ссылках и инпутах отключает браузерную 300-миллисекундную задержку двойного тапа.
   - `visualViewport.addEventListener('resize')` динамически пересчитывает переменную `--agy-vvh` в пикселях, предотвращая дергание поля чата при выезде клавиатуры IME.
   - Выборочный `transform: translateZ(0)` форсирует GPU-слои только для ключевых контейнеров скролла (`chat-container`, `.scrollable`), предотвращая исчерпание видеопамяти и зависания RenderThread на чипах ARM Mali.
-  - `ui_polish.js`: полировка мобильной палитры Dark (`#0e1014`) / Light (`#ffffff`) для `body.theme-dark` / `body.theme-light`, стилей панели быстрого перехода в диалоге выбора папки (`.agy-folder-shortcuts`) и скруглений модальных окон.
+  - `ui_polish.js`: полировка мобильной палитры Dark (`#0e1014`) / Light (`#ffffff`) для `body.theme-dark` / `body.theme-light`, стилей панели быстрого перехода в диалоге выбора папки (`.agy-folder-shortcuts`), скруглений модальных окон и компактного размера карточек входа (`w-[480px]` / `.entrance-auth-panel`) на узких мобильных экранах.
+- **`notification-bridge.js`:** полифиллит `window.Notification` и перенаправляет уведомления о завершении задач/ожидании ввода в `AndroidBridge.notifyAgentEvent` (работает в паре с нативным `AgentStatusWatcher`).
 - **`patch_main.py` (Folder Picker):** переводит начальный каталог диалога *New Project* с `$HOME` на `/storage/emulated/0/Documents` (с fallback на `/storage/emulated/0`) и добавляет кнопки быстрого перехода (`Documents`, `Downloads`, `Storage`, `System Picker`).
 - **`touch_model_menu.js`**:
   - Выпадающий список выбора моделей Antigravity в библиотеке Base UI открывает меню уровней размышления (Low / Medium / High) исключительно по hover-событию мыши.

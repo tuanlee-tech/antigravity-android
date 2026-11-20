@@ -9,9 +9,9 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Release Tag (e.g. v2.4.6)'
+        description: 'Release Tag (e.g. v2.4.7)'
         required: false
-        default: 'v2.4.6'
+        default: 'v2.4.7'
       draft:
         description: 'Create Draft Release'
         type: boolean
@@ -148,6 +148,8 @@ jobs:
 
             ### Key Highlights in this Release
 
+            * **Background Agent Completion & Input Notifications (v2.4.7):** Native `AgentStatusWatcher` + `AgentNotifier` (`agy_agent_alerts` high-importance channel) plus a token-verified `window.Notification` bridge (`notifyAgentEvent`) deliver system notifications when an agent finishes or requires user approval/input—even on the home screen or in another app—with Android 13+ `POST_NOTIFICATIONS` permission handling and tap-to-open back into `MainActivity`.
+            * **Compact Mobile Login Form (v2.4.7):** Constrains `.entrance-auth-panel`, `.entrance-title`, `[class~="w-[480px]"]` (`calc(100vw - 40px)`, `max-width: 340px`), and `#advanced-sso-panel` on mobile viewports so the login/onboarding card stays cleanly inside the screen without affecting Desktop Mode.
             * **Zero-Python Termux `git` ELF Shell Patching & `pkg` Bridge Fix:** Patches hardcoded `/data/data/com.termux/files/usr/bin/sh\0` inside `git` and `git-remote-http` ELF binaries in-place to `/system/bin/sh\0` purely in Java (`TermuxElfShellPatcher`) and Bash (`patch_elf_shell` in `pkg` & `agy-fix-paths`), plus exports `GODEBUG="netdns=cgo"` and `GIT_*` variables in `pkg` runtime bridges.
             * **Fast-Track `/android-setup` v2 + `/github-clone` + `/load-projects` + `agy-projects`:** Optimizes `/android-setup` into a single-pass bootstrap with headless GitHub device auth and `~/.git-credentials` sync; adds `/github-clone` (interactive repo browser/filter) and `/load-projects` (multi-select sidebar project loader backed by `agy-projects` live watcher JSON updates).
             * **Fixed "New Project" Folder Picker:** Defaults the interactive folder picker to `/storage/emulated/0/Documents` (also sets `EXTRA_INITIAL_URI` in Android SAF) and adds a touch-friendly quick-jump bar (`Documents`, `Downloads`, `Storage`, `System Picker`).

@@ -1,4 +1,4 @@
-# Antigravity cho Android v2.4.6
+# Antigravity cho Android v2.4.7
 
 ## Danh sách gói phát hành
 
@@ -7,6 +7,16 @@
 | **`antigravity.apk`** | `com.agy` | 45157 | Bản tiêu chuẩn giữ nguyên cơ chế kiểm tra tài khoản của Google. |
 | **`antigravity-region-bypass.apk`** | `com.agy` | 45157 | Bản bỏ qua kiểm tra điều kiện tài khoản/vùng (yêu cầu VPN/tunnel nếu cần). |
 | **`SHA256SUMS.txt`** | — | — | Mã kiểm tra toàn vẹn SHA-256 cho các tệp APK. |
+
+---
+
+## Thay đổi & Sửa lỗi (v2.4.7)
+
+* **Thông báo nền khi Agent hoàn thành hoặc cần phản hồi:**
+  * Thêm `AgentNotifier` (kênh thông báo ưu tiên cao `agy_agent_alerts`) và `AgentStatusWatcher` chạy trong `CoreServerService`, theo dõi trạng thái trajectory từ Language Server (`GetAllCascadeTrajectories`) để gửi thông báo ngay cả khi bạn đang ở màn hình chính hoặc dùng ứng dụng khác, kèm chống trùng lặp (15s TTL).
+  * Bổ sung cầu nối `window.Notification` (`web/src/core/notification-bridge.js` -> `AndroidBridge.notifyAgentEvent`) có xác thực token và xin quyền `POST_NOTIFICATIONS` trên Android 13+ trong `MainActivity`; chạm thông báo để quay lại ứng dụng (`ForegroundNotification` & `AgentNotifier`) và tự xóa thông báo agent khi mở lại app.
+* **Thu gọn form đăng nhập trên mobile:**
+  * Cập nhật CSS mobile-only trong `ui_polish.js` (không ảnh hưởng Desktop Mode) để giới hạn kích thước `.entrance-auth-panel`, `.entrance-title`, `[class~="w-[480px]"]` (`calc(100vw - 40px)`, `max-width: 340px`, `padding: 16px`), và `#advanced-sso-panel`, khắc phục lỗi form đăng nhập bị tràn viền màn hình điện thoại.
 
 ---
 

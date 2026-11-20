@@ -19,4 +19,7 @@ public final class CoreRuntimeState {
     public static volatile boolean restarting = false;
     /** Bumped on every successful ready; the UI reloads the app when it changes. */
     public static volatile int readyGeneration = 0;
+
+    /** True while MainActivity is resumed and visible to the user. */
+    public static volatile boolean appInForeground = false;
 }

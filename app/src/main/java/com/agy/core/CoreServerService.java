@@ -24,6 +24,7 @@ public final class CoreServerService extends Service {
     private RuntimeManager runtime;
     private WakeLockHolder wakeLock;
     private OpenUrlWatcher openUrlWatcher;
+    private AgentStatusWatcher agentStatusWatcher;
     private CoreProcessSupervisor supervisor;
     private com.agy.log.LogRingBuffer logBuffer;
     private com.agy.gateway.SystemGatewayServer gatewayServer;
@@ -49,6 +50,7 @@ public final class CoreServerService extends Service {
         CoreRuntimeState.serverUrl = null;
 
         ForegroundNotification.start(this);
+        AgentNotifier.ensureChannel(this);
         wakeLock = new WakeLockHolder();
         wakeLock.acquire(this);
 
@@ -58,6 +60,9 @@ public final class CoreServerService extends Service {
         supervisor = new CoreProcessSupervisor(this, runtime, openUrlWatcher, logBuffer,
                 this::onSupervisorTerminated);
         supervisor.start();
+
+        agentStatusWatcher = new AgentStatusWatcher(this);
+        agentStatusWatcher.start();
 
         startBackgroundDaemon();
     }
@@ -131,6 +136,9 @@ public final class CoreServerService extends Service {
 
     @Override
     public void onDestroy() {
+        if (agentStatusWatcher != null) {
+            agentStatusWatcher.stop();
+        }
         stopBackgroundDaemon();
         if (gatewayServer != null) {
             gatewayServer.stop();

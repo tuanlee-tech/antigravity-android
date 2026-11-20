@@ -51,6 +51,7 @@ public class MainActivity extends Activity
 
     private static final String TAG = "MainActivity";
     private static final int REQUEST_STORAGE = 100;
+    private static final int REQUEST_NOTIFICATIONS = 101;
     private static final int REQUEST_FILE_CHOOSER = 1002;
     private static final long SPLASH_TIMEOUT_MS = 60000;
     private static final long POLL_STARTUP_INTERVAL_MS = 50;
@@ -163,6 +164,7 @@ public class MainActivity extends Activity
 
         splashDeadline = System.currentTimeMillis() + SPLASH_TIMEOUT_MS;
         requestStoragePermissions();
+        requestNotificationPermission();
 
         startCoreService();
     }
@@ -277,6 +279,7 @@ public class MainActivity extends Activity
 
     @Override
     protected void onPause() {
+        CoreRuntimeState.appInForeground = false;
         activityResumed = false;
         handler.removeCallbacks(pollServer);
         if (webViewHost != null) {
@@ -294,6 +297,8 @@ public class MainActivity extends Activity
     @Override
     protected void onResume() {
         super.onResume();
+        CoreRuntimeState.appInForeground = true;
+        com.agy.core.AgentNotifier.clearAgentAlerts(this);
         activityResumed = true;
         activeActivity = this;
         if (webViewHost != null) {
@@ -348,6 +353,19 @@ public class MainActivity extends Activity
                         android.Manifest.permission.READ_EXTERNAL_STORAGE,
                         android.Manifest.permission.WRITE_EXTERNAL_STORAGE
                 }, REQUEST_STORAGE);
+            }
+        }
+    }
+
+    private void requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= 33) {
+            try {
+                String perm = "android.permission.POST_NOTIFICATIONS";
+                if (checkSelfPermission(perm) != PackageManager.PERMISSION_GRANTED) {
+                    requestPermissions(new String[]{perm}, REQUEST_NOTIFICATIONS);
+                }
+            } catch (Throwable t) {
+                Log.w(TAG, "notification permission check failed: " + t.getMessage());
             }
         }
     }

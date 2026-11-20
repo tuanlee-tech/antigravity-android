@@ -252,6 +252,36 @@ function installUiPolish(doc) {
         'color:var(--primary-foreground);' +
       '}' +
 
+      /* ---- Compact mobile login / onboarding / picker card sizing ---- */
+      'html:not(.ag-desktop-mode) .entrance-auth-panel{' +
+        'width:100%;' +
+        'max-width:100%;' +
+        'padding-left:20px;' +
+        'padding-right:20px;' +
+        'margin-top:1.25rem !important;' +
+        'box-sizing:border-box;' +
+      '}' +
+      'html:not(.ag-desktop-mode) .entrance-title{' +
+        'font-size:1.25rem !important;' +
+        'line-height:1.35 !important;' +
+        'padding-left:20px;' +
+        'padding-right:20px;' +
+      '}' +
+      'html:not(.ag-desktop-mode) [class~="w-[480px]"]{' +
+        'width:calc(100vw - 40px) !important;' +
+        'max-width:340px !important;' +
+        'padding:16px !important;' +
+        'scrollbar-gutter:auto !important;' +
+        'border-radius:16px !important;' +
+        'box-sizing:border-box !important;' +
+      '}' +
+      'html:not(.ag-desktop-mode) #advanced-sso-panel{' +
+        'margin-left:-16px !important;' +
+        'margin-right:-16px !important;' +
+        'padding-left:16px !important;' +
+        'padding-right:16px !important;' +
+      '}' +
+
       /* ---- Elevated FastPick / Dialog / Code / Scrollbar polish ---- */
       '[data-testid="fastpick"]{' +
         'border-radius:14px !important;' +
