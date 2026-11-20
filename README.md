@@ -70,6 +70,42 @@ No PRoot, chroot, or virtualization overhead. Antigravity runs **bare-metal insi
 
 ---
 
+### Cloning Private GitHub Repositories
+
+Because non-interactive commands run without terminal prompts (`GIT_TERMINAL_PROMPT=0`), authenticate Git once inside the built-in terminal before cloning or pushing private repositories (choose one method):
+
+1. **GitHub CLI (`gh`) *(Recommended)*:**
+   ```bash
+   pkg install gh
+   gh auth login
+   ```
+   Select **`GitHub.com`** &rarr; **`HTTPS`** &rarr; **`Y`** (*Authenticate Git with your GitHub credentials*) &rarr; **`Login with a web browser`** and complete authorization in the browser.
+
+2. **Personal Access Token (PAT):**
+   Create a token with `repo` access at <https://github.com/settings/tokens>, then store it:
+   ```bash
+   git config --global credential.helper store
+   printf 'https://<USERNAME>:<TOKEN>@github.com\n' > ~/.git-credentials
+   chmod 600 ~/.git-credentials
+   ```
+
+3. **SSH Key:**
+   ```bash
+   pkg install openssh
+   ssh-keygen -t ed25519 -C "antigravity-android"
+   cat ~/.ssh/id_ed25519.pub
+   ```
+   Add the printed public key at <https://github.com/settings/keys>, then clone using `git@github.com:<user>/<repo>.git`.
+
+> [!NOTE]
+> When cloning into Android shared storage (`/storage/emulated/0/...`), configure the bundled TLS CA bundle and safe directory once if needed:
+> ```bash
+> git config --global http.sslCAInfo "$HOME/usr/etc/tls/cert.pem"
+> git config --global --add safe.directory '*'
+> ```
+
+---
+
 ### Building & Testing
 
 ```bash

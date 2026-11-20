@@ -71,6 +71,42 @@ Không dùng PRoot, chroot hay lớp ảo hóa. Antigravity chạy **trực ti�
 
 ---
 
+### Clone kho mã nguồn Private trên GitHub
+
+Do các lệnh tự động chạy không hỏi mật khẩu trên terminal (`GIT_TERMINAL_PROMPT=0`), hãy đăng nhập Git **1 lần** trong Terminal tích hợp trước khi clone hoặc push repo private (chọn 1 trong 3 cách):
+
+1. **Dùng GitHub CLI (`gh`) *(Khuyên dùng)*:**
+   ```bash
+   pkg install gh
+   gh auth login
+   ```
+   Chọn lần lượt: **`GitHub.com`** &rarr; **`HTTPS`** &rarr; **`Y`** (*Authenticate Git with your GitHub credentials*) &rarr; **`Login with a web browser`** rồi xác nhận trên trình duyệt.
+
+2. **Dùng Personal Access Token (PAT):**
+   Tạo token có quyền `repo` tại <https://github.com/settings/tokens>, rồi lưu thông tin đăng nhập:
+   ```bash
+   git config --global credential.helper store
+   printf 'https://<USERNAME>:<TOKEN>@github.com\n' > ~/.git-credentials
+   chmod 600 ~/.git-credentials
+   ```
+
+3. **Dùng SSH Key:**
+   ```bash
+   pkg install openssh
+   ssh-keygen -t ed25519 -C "antigravity-android"
+   cat ~/.ssh/id_ed25519.pub
+   ```
+   Dán khóa công khai in ra vào <https://github.com/settings/keys>, sau đó clone bằng đường dẫn `git@github.com:<user>/<repo>.git`.
+
+> [!NOTE]
+> Khi clone vào bộ nhớ ngoài Android (`/storage/emulated/0/...`), nếu gặp lỗi chứng chỉ SSL hoặc ownership, chạy 2 lệnh sau 1 lần:
+> ```bash
+> git config --global http.sslCAInfo "$HOME/usr/etc/tls/cert.pem"
+> git config --global --add safe.directory '*'
+> ```
+
+---
+
 ### Biên dịch & Kiểm thử
 
 ```bash
