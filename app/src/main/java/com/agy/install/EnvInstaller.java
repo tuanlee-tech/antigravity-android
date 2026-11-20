@@ -275,13 +275,21 @@ public final class EnvInstaller {
     private static boolean bashSmokeTest(Context context, File prefix) {
         Process process = null;
         try {
+            File tmpDir = new File(prefix, "tmp");
+            File homeDir = new File(prefix.getParentFile(), "home");
+            if (!tmpDir.isDirectory()) {
+                tmpDir.mkdirs();
+            }
+            if (!homeDir.isDirectory()) {
+                homeDir.mkdirs();
+            }
             ProcessBuilder builder = new ProcessBuilder(
                     new File(prefix, "bin/bash").getAbsolutePath(), "-c", "exit 0");
             builder.directory(context.getFilesDir());
             builder.redirectErrorStream(true);
             builder.environment().put("PREFIX", prefix.getAbsolutePath());
-            builder.environment().put("HOME", new File(prefix.getParentFile(), "home").getAbsolutePath());
-            builder.environment().put("TMPDIR", new File(prefix, "tmp").getAbsolutePath());
+            builder.environment().put("HOME", homeDir.getAbsolutePath());
+            builder.environment().put("TMPDIR", tmpDir.getAbsolutePath());
             builder.environment().put("PATH", new File(prefix, "bin").getAbsolutePath() + ":/system/bin");
             builder.environment().put("LD_LIBRARY_PATH", new File(prefix, "lib").getAbsolutePath());
             File preload = new File(prefix, "lib/libtermux-exec.so");
@@ -290,11 +298,22 @@ public final class EnvInstaller {
             }
             builder.environment().put("AGY_APPLICATION_ID", context.getPackageName());
             process = builder.start();
+            String output = "";
+            try (java.io.InputStream in = process.getInputStream()) {
+                byte[] buf = com.agy.util.IoUtil.readAllBytes(in);
+                output = new String(buf, java.nio.charset.StandardCharsets.UTF_8).trim();
+            } catch (Exception ignored) {
+            }
             if (!process.waitFor(15, TimeUnit.SECONDS)) {
                 process.destroyForcibly();
+                Log.w(TAG, "bash smoke test timed out; output=" + output);
                 return false;
             }
-            return process.exitValue() == 0;
+            int rc = process.exitValue();
+            if (rc != 0) {
+                Log.w(TAG, "bash smoke test exit=" + rc + " output=" + output);
+            }
+            return rc == 0;
         } catch (Exception e) {
             if (process != null) {
                 process.destroyForcibly();

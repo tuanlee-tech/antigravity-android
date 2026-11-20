@@ -35,6 +35,7 @@ public final class TarExtractor {
     public static int untar(InputStream in, File dest) throws IOException {
         byte[] header = new byte[512];
         String pendingName = null;
+        String pendingLink = null;
         int links = 0;
         while (TarHeader.readBlock(in, header)) {
             if (TarHeader.isZeroBlock(header)) {
@@ -50,19 +51,38 @@ public final class TarExtractor {
                 type = '0';
             }
             if (type == 'L') {
-                pendingName = new String(readEntry(in, size), StandardCharsets.UTF_8).trim();
+                pendingName = trimTrailingNul(new String(readEntry(in, size), StandardCharsets.UTF_8));
                 continue;
             }
-            if (type == 'K' || type == 'x' || type == 'g') {
+            if (type == 'K') {
+                pendingLink = trimTrailingNul(new String(readEntry(in, size), StandardCharsets.UTF_8));
+                continue;
+            }
+            if (type == 'x') {
+                String paxText = new String(readEntry(in, size), StandardCharsets.UTF_8);
+                String paxPath = parsePaxField(paxText, "path");
+                String paxLink = parsePaxField(paxText, "linkpath");
+                if (paxPath != null) {
+                    pendingName = paxPath;
+                }
+                if (paxLink != null) {
+                    pendingLink = paxLink;
+                }
+                continue;
+            }
+            if (type == 'g') {
                 skipEntry(in, size);
                 continue;
             }
             if (pendingName != null) {
                 name = pendingName;
                 pendingName = null;
-            }
-            if (dirPrefix != null && !dirPrefix.isEmpty()) {
+            } else if (dirPrefix != null && !dirPrefix.isEmpty()) {
                 name = dirPrefix + "/" + name;
+            }
+            if (pendingLink != null) {
+                link = pendingLink;
+                pendingLink = null;
             }
             name = TarPath.normalize(name);
             if (name == null) {
@@ -209,6 +229,47 @@ public final class TarExtractor {
             }
             remaining -= read;
         }
+    }
+
+    private static String trimTrailingNul(String value) {
+        int end = value.length();
+        while (end > 0 && (value.charAt(end - 1) == '\0' || value.charAt(end - 1) == '\n')) {
+            end--;
+        }
+        return value.substring(0, end);
+    }
+
+    /** Parse a POSIX PAX extended header record ("<len> <key>=<value>\n"). */
+    private static String parsePaxField(String pax, String key) {
+        String prefix = key + "=";
+        int idx = 0;
+        int n = pax.length();
+        while (idx < n) {
+            int sp = pax.indexOf(' ', idx);
+            if (sp <= idx) {
+                break;
+            }
+            int recLen;
+            try {
+                recLen = Integer.parseInt(pax.substring(idx, sp).trim());
+            } catch (NumberFormatException e) {
+                break;
+            }
+            if (recLen <= 0 || idx + recLen > n) {
+                break;
+            }
+            int bodyStart = sp + 1;
+            int bodyEnd = idx + recLen;
+            if (bodyEnd > bodyStart && pax.charAt(bodyEnd - 1) == '\n') {
+                bodyEnd--;
+            }
+            String entry = pax.substring(bodyStart, bodyEnd);
+            if (entry.startsWith(prefix)) {
+                return entry.substring(prefix.length());
+            }
+            idx += recLen;
+        }
+        return null;
     }
 
     private static void skipPadding(InputStream in, long size) throws IOException {

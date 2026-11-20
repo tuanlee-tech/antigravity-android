@@ -1,4 +1,4 @@
-# Antigravity cho Android v2.4.2
+# Antigravity cho Android v2.4.3
 
 ## Danh sách gói phát hành
 
@@ -7,6 +7,21 @@
 | **`antigravity.apk`** | `com.agy` | 45157 | Bản tiêu chuẩn giữ nguyên cơ chế kiểm tra tài khoản của Google. |
 | **`antigravity-region-bypass.apk`** | `com.agy` | 45157 | Bản bỏ qua kiểm tra điều kiện tài khoản/vùng (yêu cầu VPN/tunnel nếu cần). |
 | **`SHA256SUMS.txt`** | — | — | Mã kiểm tra toàn vẹn SHA-256 cho các tệp APK. |
+
+---
+
+## Thay đổi & Sửa lỗi (v2.4.3)
+
+### 1. Chọn thư mục Project trực tiếp bằng trình quản lý tệp Android
+* Kết nối `window.dialog.showOpenDialog()` tới `AndroidBridge.openDirectoryPicker()` (`ACTION_OPEN_DOCUMENT_TREE`) qua `web/src/core/dialog-bridge.js`. Khi bấm **New Project** hoặc **Open Folder**, app tự mở bộ chọn thư mục Android và điền đường dẫn `/storage/emulated/0/...` tự động.
+
+### 2. Cải thiện giao diện cảm ứng & Chọn Model trực quan hơn
+* **Tăng kích thước nút bấm mặc định trên Mobile** (`min-height: 36–42px`) và thêm tùy chọn **UI Scale (`100% / 115% (Mobile) / 125% / 140%`)** ngay trong *Settings → Appearance* để chỉnh độ lớn giao diện trực tiếp.
+* **Sửa UX chọn Model (`touch_model_menu`):** chạm vào tên model để chuyển model ngay lập tức; chạm vào nhãn thinking effort bên phải để mở menu chọn mức suy luận (`Low / Medium / High`).
+
+### 3. Sửa lỗi không cài được `usr` / `pkg` trên Android 10
+* Bổ sung giải mã header mở rộng POSIX PAX (`x` — `path`/`linkpath`) và GNU `K` trong `TarExtractor.java` để giải nén đầy đủ các đường dẫn dài trong `bootstrap.tar.gz` khi `toybox tar` trên Android 10 fallback về Java.
+* Đảm bảo tạo sẵn thư mục `tmp` và `home` trước `bashSmokeTest`, đồng thời ghi log chi tiết vào `files/logs/env_install.log` (kèm xuất vào Diagnostics).
 
 ---
 

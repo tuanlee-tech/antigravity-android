@@ -88,6 +88,18 @@ public final class LogExporter {
                 sb.append("Error reading log file: ").append(e.getMessage()).append("\n");
             }
         }
+        File envLog = new File(context.getFilesDir(), "logs/env_install.log");
+        if (envLog.isFile() && envLog.length() > 0) {
+            sb.append("\n=== Env Install Log (files/logs/env_install.log) ===\n");
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(envLog), UTF8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    sb.append(SensitiveDataRedactor.redactLine(line)).append("\n");
+                }
+            } catch (Exception e) {
+                sb.append("Error reading env_install.log: ").append(e.getMessage()).append("\n");
+            }
+        }
         return sb.toString();
     }
 
