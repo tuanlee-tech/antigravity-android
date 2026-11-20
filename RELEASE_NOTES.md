@@ -1,66 +1,41 @@
-# Antigravity for Android v2.4.1
+# Antigravity cho Android v2.4.2
 
-## Спецификация пакетов релиза
+## Danh sách gói phát hành
 
-| Файл пакета | Идентификатор приложения | Порт рантайма | Описание |
+| Tệp gói | Mã ứng dụng | Cổng runtime | Mô tả |
 | :--- | :--- | :--- | :--- |
-| **`antigravity.apk`** | `com.agy` | 45157 | Стандартная редакция с оригинальными проверками Google (чистая версия без модификаций кода аутентификации). |
-| **`antigravity-region-bypass.apk`** | `com.agy` | 45157 | Редакция с обходом проверки учетных записей (позволяет авторизоваться под аккаунтами, блокируемыми со стороны Google; требует наличия сетевого туннеля/VPN). |
-| **`SHA256SUMS.txt`** | — | — | Криптографические контрольные суммы бинарных файлов. |
+| **`antigravity.apk`** | `com.agy` | 45157 | Bản tiêu chuẩn giữ nguyên cơ chế kiểm tra tài khoản của Google. |
+| **`antigravity-region-bypass.apk`** | `com.agy` | 45157 | Bản bỏ qua kiểm tra điều kiện tài khoản/vùng (yêu cầu VPN/tunnel nếu cần). |
+| **`SHA256SUMS.txt`** | — | — | Mã kiểm tra toàn vẹn SHA-256 cho các tệp APK. |
 
 ---
 
-## Изменения и исправления (v2.4.1)
+## Thay đổi & Sửa lỗi (v2.4.2)
 
-### 1. Поддержка встроенного веб-терминала и спавнера PTY (PR #19)
-* **Низкоуровневый бинарный патч PTY-шеллы:** Устранено аварийное завершение терминала из-за отсутствия `/bin/bash` на Android. Реализован модульный бинарный патч с сохранением длины строки (`/bin/bash` ➔ `/bin///sh`, ровно 9 байт), безопасно перенаправляющий запросы спавнера ядра в системный шелл Android без сдвига смещений ELF-секций.
-* **Приоритетная иерархия `$SHELL` в супервизоре процесса (`CoreEnvironment`):** Вместо жестко заданного `runtime/bin/bash` выстроена отказоустойчивая цепочка разрешения шелла:
-  1. `$PREFIX/bin/bash` (полноценный bash окружения пользователя со всей поддержкой `.bashrc`, автодополнения и истории);
-  2. `runtime/bin/bash` (встроенный bridge-рантайм);
-  3. `/system/bin/sh` (гарантированный системный шелл Android).
-* **Эмуляция терминала и база `terminfo`:** В окружение процесса добавлен экспорт `TERM=xterm-256color` и автоматическое подключение каталога `TERMINFO` из `$PREFIX/share/terminfo`, что предотвращает артефакты и искажения цветов и управляющих последовательностей ANSI в интерактивных консольных программах (`nano`, `htop`, mc).
+### 1. Khắc phục lỗi sập `SIGSYS` trên Android 10 (API 29) & Android 10–13
+* **Giải mã chính xác `runtime.text` của Go PIE binary:** Bổ sung `get_section_by_name`, `offset_to_vaddr` trong `elf_scanner.py` và `get_go_text_offset` trong `pclntab_scanner.py` để xác định đúng độ lệch `textStart` từ relocation `moduledata` trong `.rela.dyn`.
+* **Bổ sung 3 mô-đun vá syscall trả về `ENOSYS` để kích hoạt fallback có sẵn của Go:**
+  * `pidfd`: vá `internal/syscall/unix.PidFDOpen` (`SYS_pidfd_open`, #434) trả về `(-1, ENOSYS)` — ngăn `os.checkPidfd()` bị seccomp-bpf trên Android 10 chặn gây `SIGSYS`.
+  * `copy_file_range`: vá `internal/syscall/unix.CopyFileRange` (`SYS_copy_file_range`, #285) trả về `(0, ENOSYS)` — kích hoạt fallback về `read`/`write` trên Android 10–13.
+  * `openat2`: vá `unix.openat2` (`SYS_openat2`, #437) trả về `(-1, ENOSYS)` — kích hoạt fallback về `openat`.
 
-### 2. Повышение стабильности локальной сборки пакетов (AAPT)
-* В этапы сборки ресурсов `modules/builder/02_r_java.sh` и `modules/builder/06_package.sh` добавлен экспорт `export ANDROID_DATA="${ANDROID_DATA:-/data}"`. Это устраняет сбои компилятора `aapt` с кодом `SIGABRT (134)` при сборке APK непосредственно внутри ARM64 Android userspace.
-
----
-
-## Ранее реализованные ключевые возможности (v2.4.0)
-
-### 1. Безопасность и изоляция данных (Issue #6)
-* Из релизных сборок полностью удален атрибут `android:debuggable="true"`.
-* Устранена уязвимость, позволявшая локальному пользователю или стороннему приложению через `run-as com.agy` считывать OAuth-токены сессий и внутренние файлы конфигурации.
-* Флаг отладки изолирован исключительно в dev-сборке (`com.agy.dev`).
-
-### 2. Системный диалог выбора файлов (Issue #8)
-* Устаревший ограниченный интерфейс Storage Access Framework (SAF) заменен на нативный системный Intent-селектор Android.
-* Обеспечен прямой доступ к файлам, изображениям, видео и архивам из Галереи, Google Фото и любых сторонних файловых менеджеров.
-* Реализовано автоматическое сохранение постоянных разрешений на чтение (`Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION`).
-
-### 3. Совместимость с процессорами архитектуры ARMv8.0-A
-* Добавлена библиотека динамической эмуляции атомарных инструкций `liblse_compat.so` и низкоуровневый перехватчик `sigill_handler`.
-* Устранены аварийные завершения с кодом `SIGILL: illegal instruction` на устройствах с чипсетами Qualcomm Snapdragon 680/685 (Cortex-A53 / Redmi Note 12).
-
-### 4. Оптимизация авторизации OAuth
-* Полностью устранен дисковый опрос (polling с интервалом 80 мс) и создание промежуточных файлов при входе в учетную запись.
-* Захват URL авторизации переведен на прямой перехват стандартного потока вывода ядра (stdout) с мгновенной отправкой Intent в системный браузер.
-
-### 5. Аппаратный интерфейс фонарика
-* Добавлена консольная утилита управления вспышкой камеры: `torch on` / `torch off`.
-
-### 6. Фоновый планировщик задач (`agy-daemon`)
-* Реализован системный микро-демон (<10 МБ RAM, 0% CPU в режиме ожидания) для выполнения отложенных и периодических задач по расписанию (cron, интервалы).
-* Добавлена поддержка отслеживания изменений файлов и отправка нативных уведомлений в панель Android через `agy-notify`.
-
-### 7. Диагностика запуска ядра
-* В интерфейс ошибки инициализации сервера добавлены действия «Copy Logs» и «Save Logs» для быстрого экспорта журнала сбоя в буфер обмена или файл.
-
-### 8. Модульная структура конвейера сборки
-* Исходный код разнесен по изолированным модулям: `modules/patches`, `modules/runner`, `modules/builder`.
-* Внедрена аргументная передача параметров компиляторам `@java_sources.txt` и `@class_files.txt`, исключающая ошибку переполнения буфера командной строки ядра Linux (`ARG_MAX` / `E2BIG`).
+### 2. Tự động phát hành Release mới nhất
+* Cập nhật workflow GitHub Actions để tự động tạo **Latest Release** cho cả push tag `v*` và chạy tay `workflow_dispatch`.
 
 ---
 
-## Обновление и совместимость
+## Các tính năng chính từ v2.4.0 – v2.4.1
 
-Все сборки подписаны постоянным ключом проекта. Обновление устанавливается поверх предыдущих версий 2.x без удаления приложения. Пользовательские проекты в каталоге `Documents`, рабочее окружение и сессии полностью сохраняются.
+* **Web Terminal & PTY tích hợp:** Vá nhị phân `/bin/bash` → `/bin///sh`, chuỗi fallback `$SHELL` (`$PREFIX/bin/bash` → `runtime/bin/bash` → `/system/bin/sh`) và cấu hình `TERM=xterm-256color` / `TERMINFO`.
+* **Ổn định build AAPT trên Android ARM64:** Xuất biến `ANDROID_DATA` tránh lỗi `SIGABRT (134)`.
+* **Tăng cường bảo mật:** Gỡ `android:debuggable="true"` khỏi bản phát hành chính thức.
+* **Bộ chọn tệp gốc Android:** Thay thế SAF bằng bộ chọn hệ thống hỗ trợ Gallery, Google Photos và trình quản lý tệp.
+* **Hỗ trợ CPU ARMv8.0-A:** Giả lập lệnh LSE, FEAT_RDM và FEAT_FCMA qua `liblse_compat.so`.
+* **Tối ưu đăng nhập OAuth:** Bắt URL trực tiếp qua stdout thay vì quét tệp tạm.
+* **Đèn pin (`torch on/off`), micro-daemon nền (`agy-daemon`) và công cụ xuất log chẩn đoán.**
+
+---
+
+## Nâng cấp & Tương thích
+
+Tất cả bản build đều ký bằng cùng một keystore. Bạn có thể cài đè trực tiếp lên các phiên bản 2.x trước đó mà không cần gỡ ứng dụng hay mất dữ liệu dự án và phiên đăng nhập.

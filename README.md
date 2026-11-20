@@ -1,7 +1,7 @@
 <div align="center">
 
   <p>
-    <b>English</b> &nbsp;&bull;&nbsp; <a href="README.ru.md">Русский</a>
+    <b>English</b> &nbsp;&bull;&nbsp; <a href="README.vi.md">Tiếng Việt</a>
   </p>
 
   <br/>
