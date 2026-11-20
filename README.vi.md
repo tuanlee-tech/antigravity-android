@@ -60,6 +60,9 @@ Không dùng PRoot, chroot hay lớp ảo hóa. Antigravity chạy **trực ti�
 
 ### Bắt đầu nhanh
 
+> [!IMPORTANT]
+> Yêu cầu **thiết bị Android dùng chip ARM64 (`arm64-v8a`) gốc** chạy Android 7.0 trở lên. Các **trình giả lập x86/x86_64 trên PC** (MuMuPlayer, BlueStacks, LDPlayer, AVD x86_64) chạy dịch nhị phân ARM64 (`houdini`/`libndk_translation`) **không được hỗ trợ** và sẽ sập khi khởi chạy (`exit code 139`).
+
 1. **Tải APK bản mới nhất** tại [Latest Release](https://github.com/tuanlee-tech/antigravity-android/releases/latest):
    * [`antigravity.apk`](https://github.com/tuanlee-tech/antigravity-android/releases/latest/download/antigravity.apk) — bản tiêu chuẩn (giữ nguyên kiểm tra tài khoản Google).
    * [`antigravity-region-bypass.apk`](https://github.com/tuanlee-tech/antigravity-android/releases/latest/download/antigravity-region-bypass.apk) — bản bỏ qua kiểm tra giới hạn vùng/tài khoản.

@@ -59,6 +59,9 @@ No PRoot, chroot, or virtualization overhead. Antigravity runs **bare-metal insi
 
 ### Quick Start
 
+> [!IMPORTANT]
+> Requires a **native ARM64 (`arm64-v8a`) Android device** running Android 7.0+. **x86/x86_64 PC emulators** (MuMuPlayer, BlueStacks, LDPlayer, or x86_64 AVD) relying on ARM64 binary translation (`houdini`/`libndk_translation`) are **not supported** and will crash on startup (`exit code 139`).
+
 1. **Download Latest APK** from [Latest Release](https://github.com/tuanlee-tech/antigravity-android/releases/latest):
    * [`antigravity.apk`](https://github.com/tuanlee-tech/antigravity-android/releases/latest/download/antigravity.apk) — standard release (original Google account checks).
    * [`antigravity-region-bypass.apk`](https://github.com/tuanlee-tech/antigravity-android/releases/latest/download/antigravity-region-bypass.apk) — release with account eligibility check bypass.

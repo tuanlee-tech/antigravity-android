@@ -1,6 +1,7 @@
 package com.agy.core;
 
 import android.content.Context;
+import android.os.Build;
 import android.text.TextUtils;
 import android.util.Log;
 
@@ -167,8 +168,17 @@ public final class CoreProcessSupervisor {
                 int code = ProcessUtils.exitCode(proc);
                 ProcessUtils.sleep(200);
                 String lastLogs = getLastLinesFromLog(appContext.getFilesDir(), 10);
-                CoreRuntimeState.lastError = "core process exited before it became ready (exit code " + code + ")"
-                        + (lastLogs.isEmpty() ? "" : "\n--- core.log tail ---\n" + lastLogs);
+                if (code == 139 && isX86PrimaryAbi()) {
+                    CoreRuntimeState.lastError =
+                            "Unsupported x86/x86_64 emulator detected (exit code 139 / SIGSEGV).\n"
+                            + "The native ARM64 glibc core cannot run under x86_64 binary translation "
+                            + "(MuMuPlayer, BlueStacks, LDPlayer, or x86_64 AVD).\n"
+                            + "Please install and run Antigravity on a real ARM64 (arm64-v8a) Android device."
+                            + (lastLogs.isEmpty() ? "" : "\n--- core.log tail ---\n" + lastLogs);
+                } else {
+                    CoreRuntimeState.lastError = "core process exited before it became ready (exit code " + code + ")"
+                            + (lastLogs.isEmpty() ? "" : "\n--- core.log tail ---\n" + lastLogs);
+                }
                 CoreLogWriter.writeLine(log, CoreRuntimeState.lastError);
                 return false;
             }
@@ -227,6 +237,13 @@ public final class CoreProcessSupervisor {
             }
         }
         CoreLauncher.killOrphanCoreProcesses();
+    }
+
+    private static boolean isX86PrimaryAbi() {
+        return Build.SUPPORTED_ABIS != null
+                && Build.SUPPORTED_ABIS.length > 0
+                && Build.SUPPORTED_ABIS[0] != null
+                && Build.SUPPORTED_ABIS[0].startsWith("x86");
     }
 
     private static String getLastLinesFromLog(java.io.File filesDir, int maxLines) {
