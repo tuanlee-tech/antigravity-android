@@ -83,8 +83,9 @@ Because non-interactive commands run without terminal prompts (`GIT_TERMINAL_PRO
 1. **GitHub CLI (`gh`) *(Recommended)*:**
    ```bash
    pkg install gh
-   gh auth login
+   GODEBUG=netdns=cgo gh auth login
    ```
+   *(v2.4.5+ exports `GODEBUG=netdns=cgo` automatically in shell bridges so Go CLIs like `gh` use Android's system DNS.)*
    Select **`GitHub.com`** &rarr; **`HTTPS`** &rarr; **`Y`** (*Authenticate Git with your GitHub credentials*) &rarr; **`Login with a web browser`** and complete authorization in the browser.
 
 2. **Personal Access Token (PAT):**

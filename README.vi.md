@@ -84,8 +84,9 @@ Do các lệnh tự động chạy không hỏi mật khẩu trên terminal (`GI
 1. **Dùng GitHub CLI (`gh`) *(Khuyên dùng)*:**
    ```bash
    pkg install gh
-   gh auth login
+   GODEBUG=netdns=cgo gh auth login
    ```
+   *(Từ v2.4.5+ đã tự động export `GODEBUG=netdns=cgo` trong shell bridge để các công cụ Go như `gh` dùng DNS của Android.)*
    Chọn lần lượt: **`GitHub.com`** &rarr; **`HTTPS`** &rarr; **`Y`** (*Authenticate Git with your GitHub credentials*) &rarr; **`Login with a web browser`** rồi xác nhận trên trình duyệt.
 
 2. **Dùng Personal Access Token (PAT):**

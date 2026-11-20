@@ -1,4 +1,4 @@
-# Antigravity cho Android v2.4.4
+# Antigravity cho Android v2.4.5
 
 ## Danh sách gói phát hành
 
@@ -7,6 +7,17 @@
 | **`antigravity.apk`** | `com.agy` | 45157 | Bản tiêu chuẩn giữ nguyên cơ chế kiểm tra tài khoản của Google. |
 | **`antigravity-region-bypass.apk`** | `com.agy` | 45157 | Bản bỏ qua kiểm tra điều kiện tài khoản/vùng (yêu cầu VPN/tunnel nếu cần). |
 | **`SHA256SUMS.txt`** | — | — | Mã kiểm tra toàn vẹn SHA-256 cho các tệp APK. |
+
+---
+
+## Thay đổi & Sửa lỗi (v2.4.5)
+
+### 1. Sửa lỗi DNS cho `gh` và các công cụ Go chạy trên Bionic
+* **Nguyên nhân:** Core glibc (`language_server`) xuất `GODEBUG=netdns=go`, khiến các tiến trình con viết bằng Go (như `gh`) kế thừa biến này và tra DNS về `[::1]:53` (`connection refused`).
+* **Khắc phục:** Tự động xuất `GODEBUG="netdns=cgo"` trong các cầu nối `ShellBridgeInstaller` (tăng `BRIDGE_FORMAT` lên 4) và `env/overlay/etc/profile.d/00-env.sh`, đồng thời cập nhật sẵn `GODEBUG=netdns=cgo` trong skill `android-setup` và `README`.
+
+### 2. Tự động cập nhật skill mặc định khi nâng cấp APK
+* Nâng cấp `OnboardingSeeder.java` theo dõi SHA-256 của skill mặc định qua `.seed-hashes.properties`: tự động cập nhật `android-setup/SKILL.md` nếu là bản gốc chưa chỉnh sửa (bao gồm nâng cấp từ v2.4.4), và giữ nguyên nếu người dùng đã tự tùy chỉnh.
 
 ---
 

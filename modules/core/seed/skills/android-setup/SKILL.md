@@ -61,9 +61,9 @@ to ask what they want to do:
    GIT_CONFIG_NOSYSTEM=1 git config --global --add safe.directory '*'
    ```
 
-3. **Check existing GitHub authentication**:
+3. **Check existing GitHub authentication** (always pass `GODEBUG=netdns=cgo` for Go-based Bionic CLIs like `gh` so they use Android's system DNS instead of `[::1]:53`):
    ```bash
-   gh auth status 2>&1 || true
+   GODEBUG=netdns=cgo gh auth status 2>&1 || true
    ls -la ~/.git-credentials ~/.ssh/id_ed25519 2>&1 || true
    ```
 
@@ -71,9 +71,9 @@ to ask what they want to do:
    they prefer:
    - **GitHub CLI (`gh`) (Recommended)**:
      1. Install `gh`: `pkg install gh`
-     2. Instruct the user to run `gh auth login` in the built-in terminal and choose:
+     2. Instruct the user to run `GODEBUG=netdns=cgo gh auth login` in the built-in terminal and choose:
         `GitHub.com` → `HTTPS` → `Y` (*Authenticate Git with your GitHub credentials*) → `Login with a web browser`, then complete browser login and reply when done.
-     3. Verify with `gh auth status`.
+     3. Verify with `GODEBUG=netdns=cgo gh auth status`.
    - **Personal Access Token (PAT)**:
      1. Ask the user to create a token with `repo` scope at `https://github.com/settings/tokens`
         and run the following inside the built-in terminal (**never** ask them to paste raw tokens into chat or embed tokens inside `.git/config`):
